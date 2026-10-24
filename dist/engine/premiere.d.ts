@@ -52,6 +52,8 @@ export declare function createPremiereClient(opts?: {
     staleMs?: number;
     pollMs?: number;
     installDir?: string;
+    /** reads Premiere's windows so a long busy spell is told apart from a dialog (no host: always the dialog card) */
+    host?: Pick<PremiereHost, 'running' | 'windows'>;
 }): PremiereClient;
 /** A unique ASCII file in the queue folder for Premiere to read or write. */
 export declare function stagePath(client: PremiereClient, ext: string): Promise<string>;
@@ -64,7 +66,23 @@ export interface PremiereHost {
     launch(exe: string, project: string): {
         pid?: number;
     };
+    /** Premiere's top-level windows (Windows only; undefined when they cannot be read). */
+    windows?(pids: number[]): Promise<PremiereWindows | undefined>;
+    /** Bring Premiere's main window to the front once: CEP starts the bridge on ApplicationActivate. */
+    activate?(pids: number[]): Promise<'active' | 'tried' | 'no-window' | undefined>;
 }
+export interface PremiereWindows {
+    /** a main window is disabled: a modal dialog waits for the person */
+    modal: boolean;
+    /** titles of Premiere's dialogs while modal */
+    dialogs: string[];
+    /** Windows shows Premiere as "Not Responding" (also while it renders: not a reason to click) */
+    hung: boolean;
+}
+/** PowerShell command for one CatCutWin call; pids are integers, so nothing user-supplied reaches the script. */
+export declare function winHelperScript(method: 'Probe' | 'Activate', pids: number[]): string;
+/** Parse CatCutWin.Probe output; undefined when the probe did not finish. */
+export declare function parseWindowProbe(stdout: string): PremiereWindows | undefined;
 export declare function premiereHost(spawn?: SpawnFn): PremiereHost;
 export interface PremiereDiagnosis {
     /** connected and nothing in the way (an older bridge still counts: it works with fewer actions) */
@@ -80,6 +98,8 @@ export interface PremiereDiagnosis {
     userAction?: UserAction;
     /** an older bridge: the newer premiere_* tools answer with the update card */
     limited?: boolean;
+    /** connected and working on a long request with no dialog open: calls wait for it */
+    busy?: boolean;
     /** one line for the agent */
     note: string;
 }
@@ -105,6 +125,7 @@ export declare function openPremiere(client: PremiereClient, host: PremiereHost,
     waitMs?: number;
     pollMs?: number;
     sourceDir?: string;
+    activateAfterMs?: number;
 }): Promise<OpenResult>;
 export declare function bridgeSourceDir(): string;
 export interface InstallResult {

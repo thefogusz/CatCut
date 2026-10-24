@@ -4,7 +4,7 @@
  * "why is it not connected" diagnosis, and CatCut opening Premiere by itself. No real Premiere.
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, utimes, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, utimes, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import { basename, join } from 'node:path';
@@ -14,7 +14,7 @@ import * as projectApi from '../../src/core/project.js';
 import { JobManager } from '../../src/core/jobs.js';
 import { UserActionError } from '../../src/core/user-action.js';
 import { MockAeBackend } from '../../src/engine/ae.js';
-import { BRIDGE_ID, createPremiereClient, diagnosePremiere, openPremiere, type PremiereHost } from '../../src/engine/premiere.js';
+import { BRIDGE_ID, createPremiereClient, diagnosePremiere, openPremiere, parseWindowProbe, winHelperScript, type PremiereHost, type PremiereWindows } from '../../src/engine/premiere.js';
 import * as xmemlApi from '../../src/io/xmeml.js';
 import { safeEnvironment, type AppState } from '../../src/mcp/state.js';
 import { _binFor } from '../../src/mcp/tools-premiere.js';
@@ -238,13 +238,16 @@ describe('bridge-core 0.2', () => {
 
 // ---------- diagnosis + CatCut opening Premiere ----------
 
-function fakeHost(o: { running?: number[]; debugMissing?: string[]; onLaunch?: () => void } = {}): PremiereHost & { launches: Array<[string, string]> } {
+function fakeHost(o: { running?: number[]; debugMissing?: string[]; onLaunch?: () => void; windows?: PremiereWindows; onActivate?: () => void } = {}): PremiereHost & { launches: Array<[string, string]>; activations: number[][] } {
   const launches: Array<[string, string]> = [];
+  const activations: number[][] = [];
   return {
-    launches,
+    launches, activations,
     running: async () => o.running ?? [],
     debugModeMissing: async () => o.debugMissing ?? [],
     launch: (exe, project) => { launches.push([exe, project]); o.onLaunch?.(); return { pid: 4242 }; },
+    ...(o.windows ? { windows: async () => o.windows } : {}),
+    activate: async (pids) => { activations.push(pids); o.onActivate?.(); return 'active' as const; },
   };
 }
 
@@ -283,6 +286,56 @@ describe('diagnosePremiere: one reason, one card', () => {
     expect(dlg.userAction).toMatchObject({ code: 'premiere-dialog', why: expect.stringContaining('importMedia') });
     await beat({});
     expect(await diagnosePremiere(c, fakeHost(), exe)).toMatchObject({ ready: true });
+  });
+
+  it('a long busy spell is told apart: a dialog gets the card with its title, rendering gets "wait, nothing to click"', async () => {
+    const root = await tmp();
+    const queue = join(root, 'q'); await mkdir(queue);
+    const exe = { premiereExe: 'C:\\Adobe\\Premiere.exe' };
+    const c = createPremiereClient({ queueDir: queue, installDir: await installed(root) });
+    await writeFile(join(queue, 'bridge.json'), JSON.stringify({ protocol: 1, pid: 1, ts: Date.now(), bridge: SOURCE_VERSION, busy: { action: 'frames', since: Date.now() - 70_000 } }));
+    const dialog = await diagnosePremiere(c, fakeHost({ running: [7], windows: { modal: true, dialogs: ['Link Media'], hung: false } }), exe);
+    expect(dialog.userAction).toMatchObject({ code: 'premiere-dialog', title: expect.stringContaining('Link Media'), why: expect.stringContaining('frames') });
+    const working = await diagnosePremiere(c, fakeHost({ running: [7], windows: { modal: false, dialogs: [], hung: true } }), exe);
+    expect(working).toMatchObject({ ready: true, busy: true, note: expect.stringMatching(/no dialog open/) });
+    expect(working.userAction).toBeUndefined();
+  });
+
+  it('a call behind a rendering Premiere waits for it instead of sending the person to look for a dialog', async () => {
+    const root = await tmp();
+    const queue = join(root, 'q'); await mkdir(queue);
+    const beat = (busy: unknown) => writeFile(join(queue, 'bridge.json'), JSON.stringify({ protocol: 1, pid: 1, ts: Date.now(), bridge: SOURCE_VERSION, busy }));
+    await beat({ action: 'exportRange', since: Date.now() - 90_000 });
+    const rendering = createPremiereClient({ queueDir: queue, installDir: await installed(root), pollMs: 5, host: fakeHost({ running: [7], windows: { modal: false, dialogs: [], hung: false } }) });
+    const e = await rendering.call('status', {}, { timeoutMs: 60 }).catch((x: unknown) => x);
+    expect(e).not.toBeInstanceOf(UserActionError);
+    expect(String((e as Error).message)).toMatch(/ไม่มีหน้าต่างค้าง.*no dialog open/s);
+    // the render finishes: the waiting call goes through
+    const answered = rendering.call<{ ok: boolean }>('status', {}, { timeoutMs: 5_000 });
+    setTimeout(() => {
+      void (async () => {
+        await beat(null);
+        for (let i = 0; i < 400; i++) {
+          const name = (await readdir(queue)).find((x) => x.endsWith('.req.json'));
+          if (name) { await writeFile(join(queue, name.replace('.req.json', '.res.json')), JSON.stringify({ ok: true, data: { ok: true } })); return; }
+          await new Promise((r) => setTimeout(r, 5));
+        }
+      })();
+    }, 30);
+    expect(await answered).toEqual({ ok: true });
+    const blocked = createPremiereClient({ queueDir: queue, installDir: await installed(root), pollMs: 5, host: fakeHost({ running: [7], windows: { modal: true, dialogs: ['Import Files'], hung: false } }) });
+    await beat({ action: 'importMedia', since: Date.now() - 90_000 });
+    const d = await blocked.call('status', {}, { timeoutMs: 60 }).catch((x: unknown) => x);
+    expect((d as UserActionError).userAction).toMatchObject({ code: 'premiere-dialog', title: expect.stringContaining('Import Files') });
+  });
+
+  it('reads Premiere\'s windows with a fixed Win32 helper: pids only, nothing clicked', () => {
+    const script = winHelperScript('Probe', [12, -1, 3.5, 99]);
+    expect(script).toContain('[CatCutWin]::Probe([uint32[]]@(12,99))');
+    expect(script).not.toMatch(/keybd_event|SendInput|mouse_event/);
+    expect(parseWindowProbe('MODAL\r\nDIALOG\tLink Media\r\nHUNG\r\nEND\r\n')).toEqual({ modal: true, dialogs: ['Link Media'], hung: true });
+    expect(parseWindowProbe('END\n')).toEqual({ modal: false, dialogs: [], hung: false });
+    expect(parseWindowProbe('Add-Type failed')).toBeUndefined();
   });
 
   it('a call into a Premiere stuck behind a dialog returns the dialog card instead of queueing', async () => {
@@ -327,10 +380,27 @@ describe('openPremiere: CatCut starts Premiere with the project', () => {
     expect(s.host.launches).toEqual([]);
   });
 
+  it('a running Premiere without the bridge is brought to the front first (ApplicationActivate starts it)', async () => {
+    const s = await setup({ running: [9] });
+    const host = fakeHost({ running: [9], onActivate: () => { void s.startBridge(); } });
+    const r = await openPremiere(s.client, host, { premiereExe: 'x.exe', project: s.project, pollMs: 5, waitMs: 5_000 });
+    expect(host.activations).toEqual([[9]]);
+    expect(r).toMatchObject({ launched: false, project: { path: s.project } });
+  });
+
+  it('a launched Premiere is brought to the front only after it had time to start the bridge itself', async () => {
+    const s = await setup();
+    const host = fakeHost({ onActivate: () => { void s.startBridge(); } });
+    host.running = async () => (host.launches.length ? [4242] : []);
+    const r = await openPremiere(s.client, host, { premiereExe: 'x.exe', project: s.project, pollMs: 5, waitMs: 5_000, activateAfterMs: 60 });
+    expect(host.activations).toEqual([[4242]]);
+    expect(r).toMatchObject({ launched: true });
+  });
+
   it('a Premiere that never connects ends with a card, not a hang', async () => {
     const s = await setup({ running: [9] });
     const e = await openPremiere(s.client, s.host, { premiereExe: 'x.exe', project: s.project, pollMs: 5, waitMs: 50 }).catch((x: unknown) => x);
-    expect((e as UserActionError).userAction.code).toBe('bridge-not-started');
+    expect((e as UserActionError).userAction).toMatchObject({ code: 'bridge-not-started', frequency: 'once', steps: expect.arrayContaining([expect.stringContaining('อย่ากดปิด')]) });
     const s2 = await setup();
     s2.host.launch = () => ({ pid: 1 }); // started, but no bridge ever comes up
     const e2 = await openPremiere(s2.client, s2.host, { premiereExe: 'x.exe', project: s2.project, pollMs: 5, waitMs: 50 }).catch((x: unknown) => x);

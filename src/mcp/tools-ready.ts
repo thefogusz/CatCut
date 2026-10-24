@@ -36,7 +36,9 @@ export interface ReadinessDeps {
   freeGb?: (path: string) => Promise<number | undefined>;
 }
 
-const LOW_DISK_GB = 20;
+/** Below this the person must act (CatCut itself stops under 5 GB); up to WARN_DISK_GB it is only a note, work goes on. */
+const LOW_DISK_GB = 8;
+const WARN_DISK_GB = 20;
 const AE_CACHE_WARN_GB = 10;
 
 async function defaultFreeGb(path: string): Promise<number | undefined> {
@@ -69,12 +71,12 @@ export async function readiness(state: AppState, deps: ReadinessDeps = {}): Prom
   }
 
   // Premiere: CatCut opens it when a premiere_* tool needs it
-  state.premiere ??= createPremiereClient();
   state.premiereHost ??= premiereHost();
+  state.premiere ??= createPremiereClient({ host: state.premiereHost });
   const d = await diagnosePremiere(state.premiere, state.premiereHost, state.env.tools.premiereExe ? { premiereExe: state.env.tools.premiereExe } : {});
   if (d.userAction?.code === 'premiere-not-found') apps.push({ app: 'premiere', status: 'optional', keepOpen: 'never', note: 'ไม่พบ Premiere: ส่งงานเป็น XML ได้', userAction: act(d.userAction) });
   else if (d.userAction) apps.push({ app: 'premiere', status: 'action', keepOpen: d.userAction.keepOpen ? 'while-working' : 'catcut-opens-it', note: d.note, userAction: act(d.userAction) });
-  else apps.push({ app: 'premiere', status: 'ok', keepOpen: 'catcut-opens-it', note: d.ready ? `เชื่อมอยู่: ${d.status.project?.name ?? 'ยังไม่มีโปรเจกต์'}` : 'ปิดอยู่ ไม่เป็นไร: CatCut เปิดให้พร้อมโปรเจกต์เมื่อต้องใช้ แล้วบอกเมื่อปิดได้' });
+  else apps.push({ app: 'premiere', status: 'ok', keepOpen: 'catcut-opens-it', note: d.busy ? 'เชื่อมอยู่ กำลังทำงาน (มักเป็นการเรนเดอร์คอมป์ AE) ไม่มีหน้าต่างค้าง — รอได้ ไม่ต้องกดอะไร' : d.ready ? `เชื่อมอยู่: ${d.status.project?.name ?? 'ยังไม่มีโปรเจกต์'}` : 'ปิดอยู่ ไม่เป็นไร: CatCut เปิดให้พร้อมโปรเจกต์เมื่อต้องใช้ แล้วบอกเมื่อปิดได้' });
 
   // disk: the project drive and the temp drive
   const freeGb = deps.freeGb ?? defaultFreeGb;
@@ -84,7 +86,7 @@ export async function readiness(state: AppState, deps: ReadinessDeps = {}): Prom
     if (gb === undefined) continue;
     const r = Math.round(gb * 10) / 10;
     if (gb < LOW_DISK_GB) apps.push({ app: 'disk', status: 'action', keepOpen: 'never', note: `${root} เหลือ ${r} GB`, userAction: act(ACTIONS.diskLow({ drive: root, freeGb: r })) });
-    else apps.push({ app: 'disk', status: 'ok', keepOpen: 'never', note: `${root} เหลือ ${r} GB` });
+    else apps.push({ app: 'disk', status: 'ok', keepOpen: 'never', note: `${root} เหลือ ${r} GB${gb < WARN_DISK_GB ? ' (พอใช้ ทำงานต่อได้ — ล้างแคช AE เมื่อสะดวก ไม่ต้องหยุดรอ)' : ''}` });
   }
 
   const name: Record<UserAction['app'], string> = { ffmpeg: 'ffmpeg', 'after-effects': 'After Effects', premiere: 'Premiere Pro', disk: 'ดิสก์', catcut: 'CatCut' };

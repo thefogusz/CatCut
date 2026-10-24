@@ -182,7 +182,7 @@ function isInside(child, parent) {
     const rel = relative(resolve(parent), resolve(child));
     return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
 }
-/** Refuse writes into protected trees (built-in live jobs + EDITMCP_PROTECTED_PATHS). */
+/** Refuse writes into protected trees (EDITMCP_PROTECTED_PATHS). */
 function assertWritable(target, what) {
     if (isProtected(target))
         throw new ToolError(`ห้ามเขียนในโฟลเดอร์ที่ป้องกันไว้ / refusing to write ${what} inside a protected path`, { path: target });

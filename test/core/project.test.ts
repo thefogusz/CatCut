@@ -575,18 +575,31 @@ describe('saveProject concurrency', () => {
     expect((await loadProject(pdir)).delivery.note).toBe('blocked');
   });
 
+  it('protects nothing by default: a job folder is the user\'s to edit', () => {
+    const prev = process.env['EDITMCP_PROTECTED_PATHS'];
+    delete process.env['EDITMCP_PROTECTED_PATHS'];
+    try {
+      expect(isProtected('D:\\some-job\\review\\x.aep')).toBe(false);
+    } finally {
+      if (prev !== undefined) process.env['EDITMCP_PROTECTED_PATHS'] = prev;
+    }
+  });
+
   it('refuses to create or save projects inside protected paths', async () => {
-    expect(isProtected('D:\\261009_STB50Y_THAI-WORLD_CSR')).toBe(true);
-    // Windows-style paths are compared the Windows way (case-insensitive) on every OS
-    expect(isProtected('d:/261009_stb50y_thai-world_csr/sub/project.json')).toBe(true);
-    expect(isProtected('D:\\261009_STB50Y_THAI-WORLD_CSR_other')).toBe(false);
     const locked = path.join(dir, 'locked');
     const prev = process.env['EDITMCP_PROTECTED_PATHS'];
     process.env['EDITMCP_PROTECTED_PATHS'] = ` ${path.join(dir, 'elsewhere')} ;${locked}`;
     try {
+      expect(isProtected(path.join(locked.toUpperCase(), 'sub', 'project.json'))).toBe(process.platform === 'win32');
+      expect(isProtected(`${locked}_other`)).toBe(false);
       expect(isProtected(path.join(locked, 'a', 'b'))).toBe(true);
       // POSIX: a backslash is part of a file name, so "locked\\x" is a sibling, not inside "locked"
       if (process.platform !== 'win32') expect(isProtected(`${locked}\\x`)).toBe(false);
+      // Windows-style paths are compared the Windows way (case-insensitive, never against cwd) on every OS
+      process.env['EDITMCP_PROTECTED_PATHS'] = 'D:\\Job';
+      expect(isProtected('d:/job/sub/project.json')).toBe(true);
+      expect(isProtected('D:\\Job_other')).toBe(false);
+      process.env['EDITMCP_PROTECTED_PATHS'] = ` ${path.join(dir, 'elsewhere')} ;${locked}`;
       await expect(createProject(path.join(locked, 'p'), { name: 'x' })).rejects.toThrow(/protected/);
       expect(existsSync(locked)).toBe(false);
       await expect(saveProject(fixtureProject({ dir: path.join(locked, 'q') }))).rejects.toThrow(/protected/);

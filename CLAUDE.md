@@ -70,7 +70,7 @@ test/         vitest; synthetic media only
 
 ## Cross-cutting behavior
 - `project.json` is the single source of truth. Saves are atomic and happen under `project.lock`; a save re-reads the file and merges non-conflicting changes from other processes (MCP server + CLI may share a project). A real conflict raises `ProjectConflictError` and reloads.
-- Protected paths: built-in live production folders + `EDITMCP_PROTECTED_PATHS` (`;`-separated), enforced by `isProtected()` in `core/project.ts` and `assertWritable()` in `mcp/tools.ts`.
+- Protected paths: only `EDITMCP_PROTECTED_PATHS` (`;`-separated; nothing by default), enforced by `isProtected()` in `core/project.ts` and `assertWritable()` in `mcp/tools.ts`.
 - `ae_edit` edits a temp copy, then saves back with a `<name>_backup_<timestamp>.aep` beside the source; `saveAs` refuses existing names.
 - Timeline edits from Premiere XML are dry-run by default; `apply` first backs the timeline up under `history/` (undo: `timeline_restore`). The Reels tools (`jumpcut`, `punch_in`, `sfx_on_cuts`) follow the same rule.
 - Captions (`project.captions`) are burned into deliverables in `Assembler.deliver` via an ASS file + libass `subtitles` filter (ASCII temp path; never into the master or broadcast targets by default). Word times come from cached transcripts (`cache/transcripts/<key>.json`, key = file hash + model + lang + `TIMING_VERSION`); bump `TIMING_VERSION` in `transcribe.ts` when timing logic changes. Tests never run whisper: they write the cache file (see `test/mcp/reels.test.ts`).

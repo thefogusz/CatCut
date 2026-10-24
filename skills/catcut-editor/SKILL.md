@@ -12,11 +12,16 @@ CatCut builds video headlessly: AE comps render with aerender, ffmpeg stitches c
 - **After Effects never stays open.** CatCut runs it without a window and closes it after every job. When AE needs the user, a tool returns a `userAction` card, for example a one-time Sign in or ticking "Allow Scripts to Write Files". Show `userAction.say` **exactly as written**, then stop and wait. Never ask the user to "keep AE open", "open an empty project", or run scripts inside the AE GUI.
 - **Premiere is opened by CatCut.** Call `premiere_open {project: "<full path>.prproj"}`. It starts Premiere with that project, or opens the project in the running Premiere, and waits for the bridge. Do not ask the user to open Premiere or the CatCut Bridge panel unless a `userAction` card says so.
 - Any tool error that carries `userAction`: show `userAction.say` as is and wait. Do not invent steps, restarts or workarounds. Do not switch to computer use.
+- `ready_check` notes are not cards: a disk note such as "C: 12 GB, work can go on" or an AE cache size is information. Say it in one line and keep working. Only a `userAction` (disk under 8 GB, a dialog, a missing app) stops you.
+- AE headless fails with a `ae-headless-failed` card (GPU sanity test / log): show it once. After the user opens AE, `ae_live_run` is allowed **only when they say so** (`userAsked`); keep the same AE open and do not retry headless in a loop. A `ae-modal-open` card means a message box in AE: ask for its text, do not resend the script.
+- Premiere / AE calls that sit more than a minute: do not send a second heavy call behind them (the bridge runs one request at a time). Pull frames in small ranges (`premiere_frames` batches 40 at a time), not "every frame of 3 s" in one go.
 - After Premiere work, relay `closeHint`: say whether the project is saved and that Premiere may be closed. Close it with `premiere_close` only if CatCut opened it, or if the user asks (`force: true`).
 - Never take over the screen (computer use) to do what a CatCut tool does. If a CatCut tool is missing for the job, say so and ask; do not script Premiere or AE yourself.
 
 ## Editing the editor's Premiere sequence in place
 - Client notes on a sequence the editor works in ("cut this shot 1 s", "swap the footage", "regrade this shot", "remove the frame") go through `premiere_edit` in **that** sequence. Never push a new sequence (`premiere_push`) for a revision.
+- Taking a shot or a stretch out closes the gap: `remove {ripple: true}` or `ripple_delete {from, to}`. The cut gets shorter by what was removed. Never stretch or retime the other shots to keep the old length unless the user asks. Put a music bed that must keep playing in `keepTracks` and fix the `tail` the result reports.
+- A Premiere call that takes long with no dialog open is Premiere rendering (often After Effects comps through Dynamic Link): wait and call again. Only a `premiere-dialog` card means the user has something to click.
 - Always read first with `premiere_timeline_get`, and use `premiere_clip_effects` for colour or effect values. Each op names its clip exactly as it is now: `{track, start, end, name}`.
 - Run without `apply` first and show the user the plan. Fix any `problems`, because a clip the editor moved is refused on purpose. Then run `apply: true`. Add `save: true` only when the user wants it saved.
 - If the result has `failed` or `untouchedChanged`, say so plainly and offer `premiere_undo_last`. The checkpoint was saved right before the edit.
@@ -24,6 +29,15 @@ CatCut builds video headlessly: AE comps render with aerender, ffmpeg stitches c
 - Check results with frames Premiere renders (`premiere_frames`) or a short `premiere_export_range`, not by guessing.
 - Per-job helpers belong in `host.user.jsx` next to the installed bridge, never in `host.jsx`. An update keeps `host.user.jsx` and replaces `host.jsx`.
 - `ae_live_run` (a script in the AE the user has open) only when the user asks for it. Otherwise AE stays headless.
+
+## Client comments: only what was written, only the latest
+- Work from the **latest** comment set. Before editing, list each comment with its timecode and check it against what earlier rounds already fixed or the user cancelled (cancelled items are not "open"). Do not redo a fixed item.
+- **Change only what the comment names.** One shot to recolour = one shot. Do not "keep the other shots consistent", re-crop, shift the footage in-point or swap the take unless the comment says so. If the comment is ambiguous, ask once with the two readings.
+- **Restore means the exact earlier state:** footage range (in/out), crop/scale/position, lighting and speed together. Read the saved earlier state first (checkpoint, `timeline-before.json`), put every part back, and compare numbers before saying "restored".
+- "Add" a shot or a scene means the total length grows by it: later clips move, and the music/audio end moves with them. Say the old and new total length. "Replace" keeps the length. When a user's wording is "เพิ่ม" and the length did not change, you replaced; fix it.
+- Mark the places you changed for the user to check with `premiere_markers` (clear the old set first, then add short notes in one call). Markers are not edits; do not move clips to place them.
+- Never claim "smooth", "sharp" or "no jitter" from stills. Check motion with consecutive frames (Time Remap repeating frames, keyframe bounce) and sharpness at the size shown (a card built at 440 px and scaled up is soft). Seams between two sources (a logo mp4 then an AE render) differ in colour and decode: render them as one comp.
+- For new motion: look at the whole video first (shot length, how long graphics hold, music beat), match its light sweep and text entrances, use the client's fonts from the project font folder, keep text entrances simple at short durations (no typewriter or random-letter reveals), and show a short test before a full render.
 
 ## Files and disk: nothing the user cannot trace
 - **Use the original files under their original names.** Never copy, rename or re-export footage to use it (no `b46_1.mov`). Bins are named after card folders (`premiere_import_media` does this). Board shot numbers go in CatCut's `slot`, not in file names.

@@ -1,6 +1,6 @@
 {
   "name": "catcut",
-  "version": "0.4.0",
+  "version": "0.5.1",
   "description": "CatCut — ตัดต่อวิดีโอโดยไม่ต้องเปิดโปรแกรม Adobe (After Effects headless + ffmpeg, FCP7 XML ไป Premiere) · Headless video editing",
   "author": { "name": "thefogusz" },
   "repository": "https://github.com/thefogusz/CatCut",

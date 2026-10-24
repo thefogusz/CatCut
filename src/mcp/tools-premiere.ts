@@ -20,7 +20,7 @@ import { requireProject, type AppState } from './state.js';
 import { needsUser, RELAY, tool, ToolError, type ToolDef } from './tooldef.js';
 
 export function client(state: AppState): PremiereClient {
-  state.premiere ??= createPremiereClient();
+  state.premiere ??= createPremiereClient({ host: host(state) });
   return state.premiere;
 }
 

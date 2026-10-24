@@ -235,12 +235,12 @@ function mergeVersions(live: Record<string, unknown>, base: unknown, ours: unkno
 
 // ---------- protected paths ----------
 
-const BUILTIN_PROTECTED = ['D:\\261009_STB50Y_THAI-WORLD_CSR'];
-
-/** Built-in live production folders + EDITMCP_PROTECTED_PATHS (';'-separated). Nothing may be written inside them. */
+/**
+ * EDITMCP_PROTECTED_PATHS (';'-separated): folders nothing may be written inside. None are built in:
+ * a job folder locked during development once blocked the user's own edits (DESIGN §15).
+ */
 function protectedPaths(): string[] {
-  const extra = (process.env['EDITMCP_PROTECTED_PATHS'] ?? '').split(';').map((s) => s.trim()).filter(Boolean);
-  return [...BUILTIN_PROTECTED, ...extra];
+  return (process.env['EDITMCP_PROTECTED_PATHS'] ?? '').split(';').map((s) => s.trim()).filter(Boolean);
 }
 
 /** Windows absolute path ("D:\\job", "\\\\server\\share"): compared the Windows way on every OS, never resolved against cwd. */

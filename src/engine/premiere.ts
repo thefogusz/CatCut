@@ -24,8 +24,10 @@ import { isAscii, type SpawnFn } from './aerender.js';
 
 export const BRIDGE_ID = 'com.catcut.bridge';
 const PROTOCOL = 1;
-/** A request Premiere has been working on this long is most likely waiting behind a dialog. */
+/** After this long on one request, look whether a dialog holds Premiere (or it is just rendering). */
 const DIALOG_AFTER_MS = 45_000;
+/** How often a long wait looks for a dialog again. */
+const PROBE_EVERY_MS = 10_000;
 
 export interface PremiereProjectRef { name: string; path: string }
 export interface PremiereSequenceRef { name: string; id: string; active?: boolean }
@@ -77,7 +79,31 @@ export function cepExtensionsDir(): string {
   return join(process.env['APPDATA'] ?? join(os.homedir(), 'AppData', 'Roaming'), 'Adobe', 'CEP', 'extensions');
 }
 
-export function createPremiereClient(opts: { queueDir?: string; staleMs?: number; pollMs?: number; installDir?: string } = {}): PremiereClient {
+/**
+ * Why Premiere has been busy so long: a modal dialog waits for the person, or Premiere is working
+ * (rendering After Effects comps through Dynamic Link takes minutes and needs no click).
+ * 'unknown' when the windows cannot be read (no host, not Windows, probe failed).
+ */
+async function busyCause(host: Pick<PremiereHost, 'running' | 'windows'> | undefined): Promise<{ cause: 'dialog' | 'working' | 'unknown'; dialogs: string[]; hung?: boolean }> {
+  if (!host?.windows) return { cause: 'unknown', dialogs: [] };
+  const pids = await host.running().catch(() => [] as number[]);
+  if (!pids.length) return { cause: 'unknown', dialogs: [] };
+  const w = await host.windows(pids).catch(() => undefined);
+  if (!w) return { cause: 'unknown', dialogs: [] };
+  return w.modal ? { cause: 'dialog', dialogs: w.dialogs, hung: w.hung } : { cause: 'working', dialogs: [], hung: w.hung };
+}
+
+/** Plain error (no card) for a Premiere that is working, not waiting: nothing for the person to click. */
+function stillWorking(action: string, seconds: number, hung?: boolean): Error {
+  return new Error(`Premiere ยังทำคำสั่ง ${action} อยู่ (${seconds} วินาที) ไม่มีหน้าต่างค้าง — มักเป็นการเรนเดอร์คอมป์ AE ผ่าน Dynamic Link ไม่ต้องให้ผู้ใช้กดอะไร รอแล้วเรียกใหม่ (premiere_status ดูความคืบหน้า)`
+    + ` / Premiere is still working on '${action}' (${seconds} s) with no dialog open${hung ? ' (Windows shows it as not responding)' : ''}: probably rendering After Effects comps through Dynamic Link; wait and call again`);
+}
+
+export function createPremiereClient(opts: {
+  queueDir?: string; staleMs?: number; pollMs?: number; installDir?: string;
+  /** reads Premiere's windows so a long busy spell is told apart from a dialog (no host: always the dialog card) */
+  host?: Pick<PremiereHost, 'running' | 'windows'>;
+} = {}): PremiereClient {
   // an explicit folder is the only one; by default an older bridge still answering in TEMP is used too
   const dirs = opts.queueDir ? [opts.queueDir] : [...new Set([defaultQueueDir(), legacyQueueDir()])];
   let queueDir = dirs[0]!;
@@ -85,6 +111,13 @@ export function createPremiereClient(opts: { queueDir?: string; staleMs?: number
   const pollMs = opts.pollMs ?? 100;
   const installDir = opts.installDir ?? join(cepExtensionsDir(), BRIDGE_ID);
   let chain: Promise<unknown> = Promise.resolve();
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  /** The dialog card (also when the cause cannot be read: the person looks once). */
+  function dialogCard(busy: { action: string; seconds: number }, b: { dialogs: string[] }): UserActionError {
+    return new UserActionError(`Premiere has been busy with '${busy.action}' for ${busy.seconds} s${b.dialogs.length ? ` behind "${b.dialogs.join('", "')}"` : ''}`,
+      ACTIONS.premiereDialog({ action: busy.action, seconds: busy.seconds, ...(b.dialogs.length ? { dialogs: b.dialogs.join('", "') } : {}) }));
+  }
 
   type Beat = { protocol?: number; bridge?: string; premiere?: string; project?: PremiereProjectRef | null; busy?: { action?: string; since?: number } | null; ts?: number };
   async function beatIn(dir: string): Promise<Beat | undefined> {
@@ -112,13 +145,23 @@ export function createPremiereClient(opts: { queueDir?: string; staleMs?: number
   }
 
   async function callOnce<T>(action: string, args: Record<string, unknown>, timeoutMs: number): Promise<T> {
-    const st = await status();
+    let st = await status();
     if (!st.connected) {
       if (!st.installed) throw new UserActionError('Premiere bridge is not installed', ACTIONS.bridgeNotInstalled());
       throw new Error('Premiere is not connected: call premiere_open {project} (CatCut opens Premiere itself), or ready_check to see why / Premiere ยังไม่เชื่อม');
     }
-    if (st.busy && st.busy.seconds * 1000 >= DIALOG_AFTER_MS) {
-      throw new UserActionError(`Premiere is still busy with '${st.busy.action}' (${st.busy.seconds} s)`, ACTIONS.premiereDialog({ action: st.busy.action, seconds: st.busy.seconds }));
+    const until = Date.now() + timeoutMs;
+    // an earlier request still running: a dialog gets the card; Premiere working gets waited for
+    for (let probedAt = 0; st.busy && st.busy.seconds * 1000 >= DIALOG_AFTER_MS;) {
+      if (Date.now() - probedAt >= PROBE_EVERY_MS) {
+        probedAt = Date.now();
+        const b = await busyCause(opts.host);
+        if (b.cause !== 'working') throw dialogCard(st.busy, b);
+      }
+      if (Date.now() > until) throw stillWorking(st.busy.action, st.busy.seconds);
+      await sleep(pollMs);
+      st = await status();
+      if (!st.connected) throw new Error(`Premiere stopped answering while busy with '${st.busy?.action ?? '?'}' / Premiere หยุดตอบ: ready_check`);
     }
     // time-ordered ids keep the bridge's queue FIFO
     const id = `${Date.now().toString(36).padStart(9, '0')}-${randomUUID().slice(0, 8)}`;
@@ -127,7 +170,7 @@ export function createPremiereClient(opts: { queueDir?: string; staleMs?: number
     await mkdir(queueDir, { recursive: true });
     await writeFile(`${req}.tmp`, JSON.stringify({ id, action, args, deadline: Date.now() + timeoutMs }), 'utf8');
     await rename(`${req}.tmp`, req);
-    const until = Date.now() + timeoutMs;
+    let probedAt = Date.now();
     for (;;) {
       let raw: string | undefined;
       try { raw = await readFile(res, 'utf8'); } catch { /* not yet */ }
@@ -146,13 +189,23 @@ export function createPremiereClient(opts: { queueDir?: string; staleMs?: number
         const withdrawn = await unlink(req).then(() => true, () => false);
         const now = await status();
         if (now.busy && now.busy.seconds * 1000 >= DIALOG_AFTER_MS) {
-          throw new UserActionError(`Premiere has been busy with '${now.busy.action}' for ${now.busy.seconds} s`, ACTIONS.premiereDialog({ action: now.busy.action, seconds: now.busy.seconds }));
+          const b = await busyCause(opts.host);
+          throw b.cause === 'working' ? stillWorking(now.busy.action, now.busy.seconds, b.hung) : dialogCard(now.busy, b);
         }
         throw new Error(withdrawn
           ? `Premiere did not pick up '${action}' within ${Math.round(timeoutMs / 1000)} s`
           : `Premiere is still working on '${action}' after ${Math.round(timeoutMs / 1000)} s; check Premiere before retrying`);
       }
-      await new Promise((r) => setTimeout(r, pollMs));
+      // a dialog that comes up while this request runs is reported now, not at the timeout
+      if (opts.host?.windows && Date.now() - probedAt >= PROBE_EVERY_MS) {
+        probedAt = Date.now();
+        const now = await status();
+        if (now.busy && now.busy.seconds * 1000 >= DIALOG_AFTER_MS) {
+          const b = await busyCause(opts.host);
+          if (b.cause === 'dialog') throw dialogCard(now.busy, b);
+        }
+      }
+      await sleep(pollMs);
     }
   }
 
@@ -186,10 +239,97 @@ export interface PremiereHost {
   debugModeMissing(): Promise<string[]>;
   /** Start Premiere with a project; must not wait for it to exit. */
   launch(exe: string, project: string): { pid?: number };
+  /** Premiere's top-level windows (Windows only; undefined when they cannot be read). */
+  windows?(pids: number[]): Promise<PremiereWindows | undefined>;
+  /** Bring Premiere's main window to the front once: CEP starts the bridge on ApplicationActivate. */
+  activate?(pids: number[]): Promise<'active' | 'tried' | 'no-window' | undefined>;
+}
+
+export interface PremiereWindows {
+  /** a main window is disabled: a modal dialog waits for the person */
+  modal: boolean;
+  /** titles of Premiere's dialogs while modal */
+  dialogs: string[];
+  /** Windows shows Premiere as "Not Responding" (also while it renders: not a reason to click) */
+  hung: boolean;
+}
+
+// Win32 window helpers for PowerShell's Add-Type (C# 5): no input is simulated, nothing is clicked.
+const WIN_HELPER = `
+using System; using System.Text; using System.Collections.Generic; using System.Runtime.InteropServices;
+public static class CatCutWin {
+  public delegate bool EnumProc(IntPtr h, IntPtr l);
+  [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc f, IntPtr l);
+  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll")] static extern bool IsWindowEnabled(IntPtr h);
+  [DllImport("user32.dll")] static extern bool IsHungAppWindow(IntPtr h);
+  [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
+  [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr h, uint cmd);
+  [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int cmd);
+  [DllImport("user32.dll")] static extern void SwitchToThisWindow(IntPtr h, bool alt);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+  static List<IntPtr> Of(uint[] pids) {
+    var all = new List<IntPtr>(); var set = new HashSet<uint>(pids);
+    EnumWindows((h, l) => { uint p; GetWindowThreadProcessId(h, out p); if (set.Contains(p) && IsWindowVisible(h)) all.Add(h); return true; }, IntPtr.Zero);
+    return all;
+  }
+  static bool Owned(IntPtr h) { return GetWindow(h, 4) != IntPtr.Zero; }
+  static string Title(IntPtr h) { var sb = new StringBuilder(512); GetWindowText(h, sb, 512); return sb.ToString().Replace('\\t', ' ').Replace('\\r', ' ').Replace('\\n', ' '); }
+  public static string Probe(uint[] pids) {
+    bool modal = false, hung = false; var dialogs = new List<string>();
+    foreach (var h in Of(pids)) {
+      if (!Owned(h)) { if (!IsWindowEnabled(h)) modal = true; if (IsHungAppWindow(h)) hung = true; }
+      else if (IsWindowEnabled(h)) { var t = Title(h); if (t.Length > 0) dialogs.Add(t); }
+    }
+    var sb = new StringBuilder();
+    if (modal) { sb.Append("MODAL\\n"); foreach (var d in dialogs) sb.Append("DIALOG\\t" + d + "\\n"); }
+    if (hung) sb.Append("HUNG\\n");
+    sb.Append("END\\n");
+    return sb.ToString();
+  }
+  public static string Activate(uint[] pids) {
+    foreach (var h in Of(pids)) {
+      if (Owned(h) || Title(h).Length == 0) continue;
+      if (IsIconic(h)) ShowWindow(h, 9);
+      if (!SetForegroundWindow(h) || GetForegroundWindow() != h) SwitchToThisWindow(h, true);
+      return GetForegroundWindow() == h ? "ACTIVE" : "TRIED";
+    }
+    return "NOWINDOW";
+  }
+}`;
+
+/** PowerShell command for one CatCutWin call; pids are integers, so nothing user-supplied reaches the script. */
+export function winHelperScript(method: 'Probe' | 'Activate', pids: number[]): string {
+  const ids = pids.filter((p) => Number.isInteger(p) && p > 0).join(',');
+  return `$ErrorActionPreference='Stop'; [Console]::OutputEncoding=[Text.Encoding]::UTF8; Add-Type -TypeDefinition @'\n${WIN_HELPER}\n'@\n[CatCutWin]::${method}([uint32[]]@(${ids}))`;
+}
+
+/** Parse CatCutWin.Probe output; undefined when the probe did not finish. */
+export function parseWindowProbe(stdout: string): PremiereWindows | undefined {
+  const lines = stdout.split(/\r?\n/);
+  if (!lines.includes('END')) return undefined;
+  return { modal: lines.includes('MODAL'), hung: lines.includes('HUNG'), dialogs: lines.filter((l) => l.startsWith('DIALOG\t')).map((l) => l.slice(7).trim()).filter(Boolean) };
 }
 
 export function premiereHost(spawn: SpawnFn = execa): PremiereHost {
+  const ps = (method: 'Probe' | 'Activate', pids: number[]) => spawn('powershell.exe', [
+    '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(winHelperScript(method, pids), 'utf16le').toString('base64'),
+  ], { reject: false, windowsHide: true, timeout: 30_000 });
   return {
+    async windows(pids) {
+      if (process.platform !== 'win32' || !pids.length) return undefined;
+      const r = await ps('Probe', pids);
+      return r.exitCode === 0 ? parseWindowProbe(String(r.stdout ?? '')) : undefined;
+    },
+    async activate(pids) {
+      if (process.platform !== 'win32' || !pids.length) return undefined;
+      const r = await ps('Activate', pids);
+      const out = String(r.stdout ?? '').trim();
+      return out === 'ACTIVE' ? 'active' : out === 'TRIED' ? 'tried' : out === 'NOWINDOW' ? 'no-window' : undefined;
+    },
     async running() {
       if (process.platform !== 'win32') {
         return (await listPosixProcesses()).filter((p) => isBundleProcess(p.command, /^Adobe Premiere Pro\b/i)).map((p) => p.pid);
@@ -243,6 +383,8 @@ export interface PremiereDiagnosis {
   userAction?: UserAction;
   /** an older bridge: the newer premiere_* tools answer with the update card */
   limited?: boolean;
+  /** connected and working on a long request with no dialog open: calls wait for it */
+  busy?: boolean;
   /** one line for the agent */
   note: string;
 }
@@ -263,7 +405,14 @@ export async function diagnosePremiere(client: PremiereClient, host: PremiereHos
   }
   if (status.connected) {
     if (status.busy && status.busy.seconds * 1000 >= DIALOG_AFTER_MS) {
-      return out({ userAction: ACTIONS.premiereDialog({ action: status.busy.action, seconds: status.busy.seconds }), note: `Premiere busy with ${status.busy.action} for ${status.busy.seconds} s` });
+      const b = await busyCause(host);
+      if (b.cause === 'working') {
+        return out({ ready: true, busy: true, note: `Premiere is working on ${status.busy.action} for ${status.busy.seconds} s, no dialog open (probably rendering After Effects comps): wait, nothing to click` });
+      }
+      return out({
+        userAction: ACTIONS.premiereDialog({ action: status.busy.action, seconds: status.busy.seconds, ...(b.dialogs.length ? { dialogs: b.dialogs.join('", "') } : {}) }),
+        note: `Premiere busy with ${status.busy.action} for ${status.busy.seconds} s${b.cause === 'dialog' ? ` behind a dialog${b.dialogs.length ? ` ("${b.dialogs.join('", "')}")` : ''}` : ''}`,
+      });
     }
     const where = `Premiere ${status.premiere ?? '?'}, project ${status.project?.name ?? 'none'}`;
     if (advice) return out({ ready: true, limited: true, userAction: advice.userAction, note: `connected (${where}); ${advice.note}: newer premiere_* tools need the update` });
@@ -279,6 +428,8 @@ export async function diagnosePremiere(client: PremiereClient, host: PremiereHos
 // ---------- open Premiere with a project, wait for the bridge ----------
 
 const samePath = (a: string, b: string): boolean => resolve(a).toLowerCase() === resolve(b).toLowerCase();
+/** A launched Premiere without a bridge this long is brought to the front (it shows its window by ~20 s). */
+const ACTIVATE_AFTER_MS = 20_000;
 
 export interface OpenResult {
   project: PremiereProjectRef;
@@ -294,7 +445,7 @@ export interface OpenResult {
  * open it through the bridge when Premiere runs another one. Never closes or saves anything.
  */
 export async function openPremiere(client: PremiereClient, host: PremiereHost, opts: {
-  premiereExe?: string; project: string; waitMs?: number; pollMs?: number; sourceDir?: string;
+  premiereExe?: string; project: string; waitMs?: number; pollMs?: number; sourceDir?: string; activateAfterMs?: number;
 }): Promise<OpenResult> {
   const project = resolve(opts.project);
   if (!/\.prproj$/i.test(project)) throw new Error(`not a Premiere project (.prproj): ${project}`);
@@ -311,11 +462,22 @@ export async function openPremiere(client: PremiereClient, host: PremiereHost, o
       pid = host.launch(opts.premiereExe, project).pid;
       launched = true;
     }
-    // a freshly started Premiere needs a while; a running one that never connects needs the panel
-    const until = Date.now() + (launched ? waitMs : Math.min(waitMs, 30_000));
+    // a freshly started Premiere needs a while; a running one that never connects needs the panel.
+    // CEP starts the hidden bridge on ApplicationActivate, which never fires while Premiere sits
+    // behind other windows: bring it to the front (at most twice) before asking the person.
+    const started = Date.now();
+    const until = started + (launched ? waitMs : Math.min(waitMs, 30_000));
+    const after = opts.activateAfterMs ?? ACTIVATE_AFTER_MS;
+    const activateAt = launched ? [after, after * 3] : [0, after];
+    let activations = 0;
     for (;;) {
       const st = await client.status();
       if (st.connected) break;
+      if (host.activate && activations < activateAt.length && Date.now() - started >= activateAt[activations]!) {
+        activations++;
+        const pids = await host.running().catch(() => [] as number[]);
+        if (pids.length) await host.activate(pids).catch(() => undefined);
+      }
       if (Date.now() > until) {
         if (launched) throw new UserActionError(`Premiere started but the bridge did not connect within ${Math.round(waitMs / 1000)} s`, ACTIONS.premiereStartTimeout({ seconds: Math.round(waitMs / 1000) }));
         throw new UserActionError('Premiere runs but the bridge does not answer', ACTIONS.bridgeNotStarted());

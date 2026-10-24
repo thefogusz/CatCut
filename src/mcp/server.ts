@@ -9,7 +9,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { createAppState, type AppState } from './state.js';
 import { runTool, TOOLS } from './tools.js';
 
-const SERVER_INFO = { name: 'catcut', version: '0.4.0' } as const;
+const SERVER_INFO = { name: 'catcut', version: '0.5.1' } as const;
 
 const INSTRUCTIONS = [
   'CatCut 🐾: headless video editing (After Effects headless + aerender + ffmpeg). ทุกเวลาเป็นเฟรมที่ fps ของโปรเจกต์ (ไม่ใช่วินาที).',

@@ -56,17 +56,17 @@ describe('user action cards', () => {
 });
 
 describe('After Effects failures that need the person', () => {
-  async function backend(o: { allowed?: boolean; prefs?: boolean; runnerError?: string }) {
+  async function backend(o: { allowed?: boolean; prefs?: boolean; runnerError?: string; stderr?: string }) {
     const spawn = vi.fn(async (_bin: string, args: string[]) => {
       if (o.runnerError) {
         const launcher = await readFile(args[3]!, 'utf8');
         const job = JSON.parse(await readFile(JSON.parse(/var EDITMCP_JOB = (.*);/.exec(launcher)![1]!), 'utf8')) as { result: string };
         await writeFile(job.result, JSON.stringify({ ok: false, error: o.runnerError }));
       }
-      return { exitCode: 0, stdout: '', stderr: '' }; // AE quit without running the script: no result
+      return { exitCode: 0, stdout: '', stderr: o.stderr ?? '' }; // AE quit without running the script: no result
     });
     const scriptingPref = async () => (o.prefs === false ? {} : { prefsFile: 'p.txt', aeVersion: '26.5', ...(o.allowed !== undefined ? { allowed: o.allowed } : {}) });
-    return createAeBackend({ ffmpeg: 'ffmpeg', ffprobe: 'ffprobe', afterfx: 'AfterFX.com' }, { spawn: spawn as unknown as SpawnFn, minFreeRamGb: 0, listProcesses: async () => [], scriptingPref });
+    return createAeBackend({ ffmpeg: 'ffmpeg', ffprobe: 'ffprobe', afterfx: 'AfterFX.com' }, { spawn: spawn as unknown as SpawnFn, minFreeRamGb: 0, retryDelayMs: 1, listProcesses: async () => [], scriptingPref });
   }
   const codeOf = async (p: Promise<unknown>) => ((await p.catch((e: unknown) => e)) as UserActionError).userAction?.code;
 
@@ -74,6 +74,29 @@ describe('After Effects failures that need the person', () => {
     expect(await codeOf((await backend({ allowed: false })).version())).toBe('ae-allow-scripts');
     expect(await codeOf((await backend({ allowed: true })).version())).toBe('ae-first-run');
     expect(await codeOf((await backend({ prefs: false })).version())).toBe('ae-first-run');
+  });
+
+  it('a GPU sanity-test / log failure is not a sign-in problem: its own card, but Allow Scripts off still wins', async () => {
+    expect(await codeOf((await backend({ allowed: true, stderr: 'GPU3 failed (previous) sanity test' })).version())).toBe('ae-headless-failed');
+    expect(await codeOf((await backend({ allowed: true, stderr: 'InitializeFileLogging failed' })).version())).toBe('ae-headless-failed');
+    expect(await codeOf((await backend({ allowed: false, stderr: 'GPU3 failed sanity test' })).version())).toBe('ae-allow-scripts');
+  });
+
+  it('a startup failure is retried once before the card (second launch may pass)', async () => {
+    let n = 0;
+    const spawn = vi.fn(async (_b: string, args: string[]) => {
+      n++;
+      if (n > 1) {
+        const launcher = await readFile(args[3]!, 'utf8');
+        const job = JSON.parse(await readFile(JSON.parse(/var EDITMCP_JOB = (.*);/.exec(launcher)![1]!), 'utf8')) as { result: string };
+        await writeFile(job.result, JSON.stringify({ ok: true, data: { version: '26.5' } }));
+        return { exitCode: 0, stdout: '', stderr: '' };
+      }
+      return { exitCode: 0, stdout: '', stderr: 'GPU3 failed (previous) sanity test' };
+    });
+    const b = createAeBackend({ ffmpeg: 'ffmpeg', ffprobe: 'ffprobe', afterfx: 'AfterFX.com' }, { spawn: spawn as unknown as SpawnFn, minFreeRamGb: 0, retryDelayMs: 1, listProcesses: async () => [], scriptingPref: async () => ({ prefsFile: 'p', allowed: true }) });
+    await b.version().catch(() => undefined);
+    expect(n).toBe(2);
   });
 
   it('"cannot write" from the runner maps to the card only when the pref really is off', async () => {
@@ -120,7 +143,7 @@ describe('ready_check', () => {
   }
 
   it('lists each app with what stays open and the cards to follow', async () => {
-    const r = await readiness(await state(), { aePref: async () => ({ prefsFile: 'p', aeVersion: '26.5', allowed: false }), freeGb: async () => 12 });
+    const r = await readiness(await state(), { aePref: async () => ({ prefsFile: 'p', aeVersion: '26.5', allowed: false }), freeGb: async () => 6 });
     expect(r.ready).toBe(false);
     expect(r.apps.map((a) => [a.app, a.status, a.keepOpen])).toEqual([
       ['ffmpeg', 'ok', 'never'],
@@ -144,6 +167,13 @@ describe('ready_check', () => {
     expect(r.ready).toBe(true);
     expect(r.apps.find((a) => a.app === 'premiere')).toMatchObject({ status: 'ok', keepOpen: 'catcut-opens-it', note: expect.stringContaining('CatCut เปิดให้') });
     expect(r.say).toContain('ไม่ต้องเปิดโปรแกรมไหนค้างไว้');
+  });
+
+  it('12 GB free is a note, not a card that stops the agent; under 8 GB is a card', async () => {
+    const note = await readiness(await state(), { aePref: async () => ({ prefsFile: 'p', aeVersion: '26.5', allowed: true }), freeGb: async () => 12 });
+    expect(note.apps.filter((a) => a.app === 'disk').every((a) => a.status === 'ok' && !a.userAction && a.note.includes('ทำงานต่อได้'))).toBe(true);
+    const low = await readiness(await state(), { aePref: async () => ({ prefsFile: 'p', aeVersion: '26.5', allowed: true }), freeGb: async () => 6 });
+    expect(low.apps.find((a) => a.app === 'disk')).toMatchObject({ status: 'action', userAction: { code: 'disk-low' } });
   });
 
   it('missing AE is optional, missing ffmpeg is an action', async () => {

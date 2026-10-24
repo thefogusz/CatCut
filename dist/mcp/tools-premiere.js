@@ -16,7 +16,7 @@ import { card } from '../core/user-action.js';
 import { requireProject } from './state.js';
 import { needsUser, RELAY, tool, ToolError } from './tooldef.js';
 export function client(state) {
-    state.premiere ??= createPremiereClient();
+    state.premiere ??= createPremiereClient({ host: host(state) });
     return state.premiere;
 }
 function host(state) {

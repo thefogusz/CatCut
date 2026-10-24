@@ -8,7 +8,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createAppState } from './state.js';
 import { runTool, TOOLS } from './tools.js';
-const SERVER_INFO = { name: 'catcut', version: '0.4.0' };
+const SERVER_INFO = { name: 'catcut', version: '0.5.1' };
 const INSTRUCTIONS = [
     'CatCut 🐾: headless video editing (After Effects headless + aerender + ffmpeg). ทุกเวลาเป็นเฟรมที่ fps ของโปรเจกต์ (ไม่ใช่วินาที).',
     'Flow: doctor → project_new/project_open → asset_add → timeline_set (or timeline_edit / audio_add) → build (returns job id; call job_wait {id}) → deliver → export_premiere_xml.',

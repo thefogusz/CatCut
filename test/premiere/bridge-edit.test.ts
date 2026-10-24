@@ -41,7 +41,7 @@ const baseComps = (): Comp[] => [
   { displayName: 'Motion', matchName: 'AE.ADBE Motion', props: [{ displayName: 'Position', value: [0.5, 0.5] }, { displayName: 'Scale', value: 100 }, { displayName: 'Rotation', value: 0 }] },
 ];
 
-function fakePremiere(projectPath: string) {
+function fakePremiere(projectPath: string, o: { linkedMoves?: boolean } = {}) {
   const fs = require('node:fs') as typeof import('node:fs');
   let nextNode = 1;
   const items: Item[] = [];
@@ -73,7 +73,12 @@ function fakePremiere(projectPath: string) {
     getSpeed: () => c.speed,
     get components() { const o: Record<string, unknown> = { numItems: c.comps.length }; c.comps.forEach((x, i) => { o[i] = { displayName: x.displayName, matchName: x.matchName, get properties() { const p: Record<string, unknown> = { numItems: x.props.length }; x.props.forEach((y, j) => { p[j] = propObj(y); }); return p; } }; }); return o; },
     remove: () => { list.splice(list.indexOf(c), 1); },
-    move: (t: { seconds: number }) => { const d = T(t); c.start += d; c.end += d; },
+    move: (t: { seconds: number }) => {
+      const d = T(t);
+      // some Premiere versions drag the linked audio along with a video clip
+      if (o.linkedMoves && video.includes(list)) for (const l of audio) for (const x of l) if (x.item === c.item && x.start === c.start && x.end === c.end) { x.start += d; x.end += d; }
+      c.start += d; c.end += d;
+    },
   });
   const sortAll = () => [...video, ...audio].forEach((l) => l.sort((a, b) => a.start - b.start));
   const trackObj = (list: Clip[], kind: 'V' | 'A', index: number) => ({
@@ -90,7 +95,17 @@ function fakePremiere(projectPath: string) {
   });
   const tracks = (lists: Clip[][], kind: 'V' | 'A') => { const o: Record<string, unknown> = { numTracks: lists.length }; lists.forEach((l, i) => { o[i] = trackObj(l, kind, i); }); return o; };
   let inOut = { in: -400000, out: -400000 };
+  // sequence markers: Premiere's linked-list style API; colours as indexes
+  const markerList: Array<{ start: { seconds: number }; end: { seconds: number }; name: string; comments: string; color: number }> = [];
+  const markerObj = (m: (typeof markerList)[number]) => Object.assign(m, { getColorByIndex: () => m.color, setColorByIndex: (c: number) => { m.color = c; } });
+  const markers = {
+    getFirstMarker: () => markerList[0],
+    getNextMarker: (m: (typeof markerList)[number]) => markerList[markerList.indexOf(m) + 1],
+    createMarker: (s: number) => { const m = markerObj({ start: { seconds: s }, end: { seconds: s }, name: '', comments: '', color: 0 }); markerList.push(m); return m; },
+    deleteMarker: (m: (typeof markerList)[number]) => { const i = markerList.indexOf(m); if (i < 0) return false; markerList.splice(i, 1); return true; },
+  };
   const seq = {
+    markers,
     name: 'EDIT', sequenceID: 'seq-1', end: String(Math.round(20 * 254016000000)),
     getSettings: () => ({ videoFrameRate: { seconds: 1 / FPS }, videoDisplayFormat: 101, videoFrameWidth: 1920, videoFrameHeight: 1080 }),
     get videoTracks() { return tracks(video, 'V'); }, get audioTracks() { return tracks(audio, 'A'); },
@@ -250,6 +265,39 @@ describe('host.jsx: premiere_edit ops', () => {
     expect(p.saves).toEqual([]);
   });
 
+  const layout = (p: ReturnType<typeof fakePremiere>, track: 'V' | 'A', i: number) => (track === 'V' ? p.video : p.audio)[i]!.map((c) => [c.name, c.start, c.end, c.inP]);
+
+  it('remove with ripple closes the gap on every track: the cut gets shorter (field note: "ตัดอะไรออกก็เขยิบเข้ามา")', () => {
+    for (const linkedMoves of [false, true]) {
+      const p = fakePremiere('C:\job\JOB.prproj', { linkedMoves });
+      const r = p.dispatch('edit', { apply: true, ops: [{ op: 'remove', clip: sel('V1', 100, 150, 'C0002.MP4'), ripple: true }] });
+      expect(r.data).toMatchObject({ failed: null, untouchedChanged: [], results: [{ op: 'remove', ripple: true, removedFrames: 50, pictureEnd: 200, end: 200, shifted: 2 }] });
+      expect(r.data!['results'][0].tail).toBeUndefined();
+      expect(layout(p, 'V', 0)).toEqual([['C0001.MP4', 0, 100, 0], ['C0003.MP4', 100, 200, 0]]);
+      expect(layout(p, 'A', 0)).toEqual([['C0001.MP4', 0, 100, 0], ['C0003.MP4', 100, 200, 0]]);
+      expect(p.video[1]).toEqual([]); // the title over the removed shot went with it
+    }
+  });
+
+  it('ripple_delete trims the edges, refuses to cut through a music bed unless that track is kept, reports a sound tail', () => {
+    const p = fakePremiere('C:\job\JOB.prproj');
+    const music = { type: 1, name: 'music.wav', nodeId: '99', media: 'D:\music.wav', durSec: 100, hasAudio: true };
+    p.audio[1]!.push({ name: 'music.wav', item: music, start: 0, end: 250, inP: 0, speed: 1, comps: [] });
+    const before = JSON.stringify([p.video, p.audio]);
+    const refused = p.dispatch('edit', { ops: [{ op: 'ripple_delete', from: 50, to: 120 }] });
+    expect(refused.data!['problems'][0].error).toMatch(/middle out of music\.wav on A2 0-250.*keepTracks/);
+    const dry = p.dispatch('edit', { ops: [{ op: 'ripple_delete', from: '00:00:02:00', to: 120, keepTracks: ['A2'] }] });
+    expect(dry.data).toMatchObject({ problems: [], plan: [{ op: 'ripple_delete', from: 50, to: 120, removedFrames: 70, pictureEnd: 180, end: 250, keptTracks: ['A2'] }] });
+    expect(JSON.stringify([p.video, p.audio])).toBe(before); // dry run changes nothing
+    const r = p.dispatch('edit', { apply: true, ops: [{ op: 'ripple_delete', from: 50, to: 120, keepTracks: ['A2'] }] });
+    expect(r.data).toMatchObject({ failed: null, untouchedChanged: [] });
+    expect(r.data!['results'][0].tail).toMatch(/70 frames past the last picture/);
+    expect(layout(p, 'V', 0)).toEqual([['C0001.MP4', 0, 50, 0], ['C0002.MP4', 50, 80, 70], ['C0003.MP4', 80, 180, 0]]);
+    expect(layout(p, 'A', 0)).toEqual([['C0001.MP4', 0, 50, 0], ['C0002.MP4', 50, 80, 70], ['C0003.MP4', 80, 180, 0]]);
+    expect(layout(p, 'V', 1)).toEqual([['title.png', 50, 80, 20]]);
+    expect(layout(p, 'A', 1)).toEqual([['music.wav', 0, 250, 0]]);
+  });
+
   it('a failing op stops the run and names it', () => {
     const p = fakePremiere('C:\\job\\JOB.prproj');
     const r = p.dispatch('edit', { apply: true, ops: [{ op: 'rename', clip: sel('V1', 0, 100), name: 'X' }, { op: 'remove_effect', clip: sel('V1', 0, 100), effect: 'Motion' }] });
@@ -320,6 +368,43 @@ describe('premiere_edit / premiere_undo_last tools', () => {
     expect(prem.closed()).toBe(1);
     const again = await call('premiere_undo_last', { project: projectPath });
     expect(again).toMatchObject({ isError: true, data: { error: expect.stringMatching(/ยังไม่มีจุดย้อนกลับ/) } });
+  });
+
+  it('an installed host.jsx without ripple answers with the update card (no restart), not a raw op error', async () => {
+    const { projectPath, prem, call } = await live();
+    const real = prem.evalScript.getMockImplementation()!;
+    prem.evalScript.mockImplementation(async (script: string) => (script.includes('"edit"')
+      ? JSON.stringify({ ok: true, data: { plan: [null], problems: [{ op: 0, error: 'unknown op: ripple_delete' }] } })
+      : real(script)));
+    const r = await call('premiere_edit', { project: projectPath, ops: [{ op: 'ripple_delete', from: 0, to: 10 }] });
+    expect(r).toMatchObject({ isError: true, data: { userAction: { code: 'bridge-update', why: expect.stringContaining('ripple_delete') } } });
+  });
+
+  it('premiere_markers: dry run shows the plan, apply clears the old red ones only and adds the new set', async () => {
+    const { projectPath, prem, call } = await live();
+    const mk = (prem.ctx as unknown as { __x?: unknown }) && undefined; void mk;
+    const seed = await call('premiere_markers', { project: projectPath, apply: true, add: [
+      { at: 10, name: 'old red', color: 'red' }, { at: 60, name: 'blue note', color: 'blue' }, { at: '00:00:04:00', name: 'old red 2', color: 'red', dur: 5 },
+    ] });
+    expect(seed.data).toMatchObject({ ok: true, added: 3, removed: 0, total: 3 });
+    const dry = await call('premiere_markers', { project: projectPath, clear: { colors: ['red'] }, add: [{ at: 30, name: 'ใหม่ ปรับครอป', comment: 'crop' }] });
+    expect(dry.data).toMatchObject({ ok: true, dryRun: true, existing: 3, willRemove: [{ frame: 10, color: 1 }, { frame: 100, end: 105, color: 1 }], willAdd: [{ frame: 30, color: 1, name: 'ใหม่ ปรับครอป' }] });
+    const done = await call('premiere_markers', { project: projectPath, apply: true, clear: { colors: ['red'] }, add: [{ at: 30, name: 'ใหม่ ปรับครอป' }] });
+    expect(done.data).toMatchObject({ ok: true, removed: 2, added: 1, total: 2 });
+    const after = await call('premiere_markers', { project: projectPath });
+    expect(after.data['markers'].map((m: { name: string; color: number }) => [m.name, m.color])).toEqual([['blue note', 6], ['ใหม่ ปรับครอป', 1]]);
+    const noCriteria = await call('premiere_markers', { project: projectPath, apply: true, clear: {} });
+    expect(noCriteria).toMatchObject({ isError: true, data: { error: expect.stringMatching(/needs all, colors or nameContains/) } });
+  });
+
+  it('premiere_frames fetches long ranges in batches of 40 and keeps every frame', async () => {
+    const { projectPath, prem, call } = await live();
+    const seen: number[] = [];
+    const real = prem.evalScript.getMockImplementation()!;
+    prem.evalScript.mockImplementation(async (script: string) => { if (script.includes('"frames"')) seen.push(1); return real(script); });
+    const r = await call('premiere_frames', { project: projectPath, from: 0, to: 100 });
+    expect(r.data['frames']).toHaveLength(100);
+    expect(seen.length).toBe(3);
   });
 
   it('premiere_place_ae_comp is a guarded overwrite (dry run first)', async () => {

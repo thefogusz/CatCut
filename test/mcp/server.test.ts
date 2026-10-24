@@ -527,14 +527,17 @@ describe('AE jobs, write confinement and forceAssets', () => {
     expect(String(r2['error'])).toMatch(/saveAs/);
     const prev = process.env['EDITMCP_PROTECTED_PATHS'];
     const locked = join(dir, 'locked');
-    process.env['EDITMCP_PROTECTED_PATHS'] = locked;
+    const locked2 = join(dir, 'locked2');
+    // keep what the test run protects (vitest.config.ts) on top of this test's own folders
+    process.env['EDITMCP_PROTECTED_PATHS'] = [locked, locked2, prev].filter(Boolean).join(';');
     try {
       const n = await callTool(st, 'project_new', { dir: join(locked, 'p'), name: 'x' });
       expect(n.isError).toBe(true);
       expect(toolResultData(n)['error']).toMatch(/protected/);
       expect(existsSync(locked)).toBe(false);
-      expect((await callTool(st, 'project_new', { dir: 'D:\\261009_STB50Y_THAI-WORLD_CSR\\editmcp', name: 'x' })).isError).toBe(true);
-      process.env['EDITMCP_PROTECTED_PATHS'] = dir; // now the open project itself is protected
+      expect((await callTool(st, 'project_new', { dir: join(locked2, 'editmcp'), name: 'x' })).isError).toBe(true);
+      expect(existsSync(locked2)).toBe(false);
+      process.env['EDITMCP_PROTECTED_PATHS'] = [dir, prev].filter(Boolean).join(';'); // now the open project itself is protected
       const e = await callTool(st, 'timeline_edit', { ops: [{ op: 'remove_audio', id: 'none' }] });
       expect(toolResultData(e)['error']).toMatch(/protected/);
       expect((await callTool(st, 'ae_edit', { aep, comp: 'Title_01', ops: [{ op: 'setText', layer: 1, text: 'x' }] })).isError).toBe(true);

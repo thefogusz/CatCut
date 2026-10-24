@@ -18,6 +18,8 @@ type Opts = Record<string, string | number | undefined>;
 export declare const ACTIONS: {
     aeNotFound: () => UserAction;
     aeFirstRun: (o?: Opts) => UserAction;
+    aeHeadlessFailed: (o?: Opts) => UserAction;
+    aeModalOpen: (o?: Opts) => UserAction;
     aeAllowScripts: () => UserAction;
     aeCloseMac: () => UserAction;
     macAutomation: () => UserAction;

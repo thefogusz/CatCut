@@ -146,6 +146,9 @@ function guiWindows(procs: AeProcess[]): AeProcess[] {
   return procs.filter((p) => p.title && !/^n\/a$/i.test(p.title.trim()));
 }
 
+/** AE quit at startup for a reason that is neither sign-in nor Allow Scripts (seen on field machines). */
+const AE_STARTUP_FAILURE = /GPU\d*\b.*sanity|sanity test|InitializeFileLogging/i;
+
 export function createAeBackend(tools: ToolPaths, opts: AeOptions = {}): HeadlessAeBackend {
   const spawn = opts.spawn ?? execa;
   const runner = fileURLToPath(new URL('../../jsx/runner.jsx', import.meta.url));
@@ -168,10 +171,20 @@ export function createAeBackend(tools: ToolPaths, opts: AeOptions = {}): Headles
     const detail = `AfterFX ${action}: exit ${exitCode ?? '?'}, no result${stderr.trim() ? `: ${stderr.trim()}` : ''}`;
     const pref = await scriptingPref();
     if (pref.allowed === false) return new UserActionError(detail, ACTIONS.aeAllowScripts());
+    if (AE_STARTUP_FAILURE.test(stderr)) return new UserActionError(detail, ACTIONS.aeHeadlessFailed({ detail: stderr.trim().slice(-120) }));
     return new UserActionError(detail, ACTIONS.aeFirstRun({ detail: `exit ${exitCode ?? '?'}` }));
   }
 
+  /** A startup failure (GPU sanity / log) is often gone on the next launch; one retry before asking the person. */
   async function run<T>(action: string, payload: Record<string, unknown> = {}): Promise<Result<T>> {
+    try { return await runOnce<T>(action, payload); } catch (e) {
+      if (!(e instanceof UserActionError) || e.userAction.code !== 'ae-headless-failed') throw e;
+      await new Promise((r) => setTimeout(r, opts.retryDelayMs ?? 5000));
+      return runOnce<T>(action, payload);
+    }
+  }
+
+  async function runOnce<T>(action: string, payload: Record<string, unknown> = {}): Promise<Result<T>> {
     if (!tools.afterfx) throw new UserActionError('AfterFX not found; install After Effects or set EDITMCP_AE_DIR', ACTIONS.aeNotFound());
     const minRam = opts.minFreeRamGb ?? 0.75;
     if (freeRamBytes() / 2 ** 30 < minRam) throw new Error(`not enough free RAM for After Effects (need ${minRam} GB)`);
@@ -207,7 +220,7 @@ export function createAeBackend(tools: ToolPaths, opts: AeOptions = {}): Headles
       if (mac && report === undefined && /-1743|not authori[sz]ed/i.test(stderr)) throw new UserActionError(`osascript: ${stderr.trim()}`, ACTIONS.macAutomation());
       // No result at all: the runner never got to write one (scripts may not write files, or AE quit
       // at a first-run screen). Both need the person, so say which one instead of a raw error.
-      if (report === undefined) throw await noResult(action, output.exitCode, stderr);
+      if (report === undefined) throw await noResult(action, output.exitCode, `${String(output.stderr ?? '')}\n${String(output.stdout ?? '')}`.trim().slice(-500));
       // osascript often fails once AE quits under it (-609): on macOS the result file decides
       if (!mac && output.exitCode !== 0) throw new Error(`AfterFX failed (${output.exitCode}): ${report}`);
       const result = JSON.parse(report.replace(/^\uFEFF/, '')) as Result<T>;
