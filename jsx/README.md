@@ -12,6 +12,11 @@ it. They use `aerender.exe` (`src/engine/aerender.ts`).
    - `launch.jsx`: two generated lines, `var EDITMCP_JOB = "<job path>"; $.evalFile(runner.jsx)`.
      User values (Thai paths, comp names, text) never go into JSX source. They only travel in the JSON.
 2. It spawns `AfterFX.com -m -noui -r launch.jsx` without a shell. A timeout kills the whole process tree.
+   macOS has no `-noui` or `-m`: `ae.ts` runs `osascript` with `tell application "Adobe After Effects <year>" to
+   DoScriptFile "<launch.jsx>"`. AE opens with its UI, runs the job, and the runner's `app.quit()` closes it. Since a Mac user
+   can only run one AE, `ae.ts` refuses to start while AE is open (that would be the person's own session) and waits
+   for AE to quit before the next job. osascript often exits non-zero when AE quits under it, so on macOS the result file
+   decides success.
 3. The runner opens the project, does the action, writes `{ ok, data, log, error }` to `job.result`, closes
    the project without saving and calls `app.quit()`. If the job file itself cannot be read, the result is
    written to `<job path minus .json>.result.json` (`job.result.json`), which is the path `ae.ts` already

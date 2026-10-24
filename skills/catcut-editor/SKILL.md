@@ -68,6 +68,13 @@ Cards only collect choices; the actual work still goes through CatCut tools.
 6. **Review**: run `qc_report`, then `rules_check` (machine checks → `style` issues plus a visual checklist). `review_open` returns the URL directly; give it to the user. QC on a clip without audio always reports silence/loudness: say so once, do not repeat it every round.
 7. **Fix loop**: address each note, rebuild, and review again until clean.
 
+## Reels / TikTok / Shorts (talking head)
+- Order: `jumpcut` → `punch_in` → `transcribe` → `captions_set` + `captions_plan` → `text_add` (hook) → `sfx_on_cuts` (only with SFX files the user gave) → `build` → `deliver vert`. `/catcut:reel` walks through it.
+- Timeline tools (`jumpcut`, `punch_in`, `sfx_on_cuts`) are dry runs first: show what changes, then `apply: true`. Each apply backs the timeline up (`timeline_restore` undoes it).
+- Captions and hook text are **burned into deliverables only** (not the ProRes master); broadcast/master targets never get them unless named in `captions_set {targets}`.
+- **Proofread `captions_plan` before delivering.** whisper mishears brand names and English words in Thai speech: fix them with `captions_set {fixes}`; never retype captions by hand.
+- Transcription is local (whisper.cpp) and cached per file; nothing leaves the machine. If `doctor` says whisper or libass is missing, tell the user the exact fix instead of working around it.
+
 ## Report "fixed" only with evidence
 Before saying a fix is done (for example "corners are round everywhere"), call `rules_evidence {assetId | clipIds, version}`. It grabs **one frame per timeline instance** from that version's master into `review/evidence/<version>/` and makes a contact sheet. For review notes pass `offsets` (each note's frame minus the clip start) so the sheet shows exactly the noted spots. Attach every frame. If an instance is missing or still wrong, the fix is not done.
 

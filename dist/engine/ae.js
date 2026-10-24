@@ -6,6 +6,7 @@ import { basename, dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { hashFile, hashJson } from '../core/hash.js';
+import { freeRamBytes, isBundleProcess, listPosixProcesses } from '../core/platform.js';
 import { ACTIONS, UserActionError } from '../core/user-action.js';
 import { aeScriptingPref } from './housekeeping.js';
 import { aerender, defaultMfrPercent, isAscii, isMissingOmTemplate, killTree, moveFile, purgeIfLowCacheSpace, uniqueOutputPath, } from './aerender.js';
@@ -29,10 +30,16 @@ function serial(fn) {
     queue = result.catch(() => undefined);
     return result;
 }
-/** AfterFX.exe processes via `tasklist /V` (window title separates a GUI from -noui instances). */
+/**
+ * AfterFX.exe processes via `tasklist /V` (window title separates a GUI from -noui instances). On macOS
+ * every After Effects process is a GUI (there is no -noui), so each gets its app name as title.
+ */
 export async function listAfterFxProcesses(spawn = execa) {
-    if (process.platform !== 'win32')
-        return [];
+    if (process.platform !== 'win32') {
+        const procs = await listPosixProcesses();
+        return procs.filter((p) => isBundleProcess(p.command, /^Adobe After Effects\b/i))
+            .map((p) => ({ name: basename(p.command), pid: p.pid, title: p.command.replace(/^.*\/([^/]+)\.app\/.*$/, '$1') }));
+    }
     const r = await spawn('tasklist', ['/V', '/FO', 'CSV', '/NH', '/FI', 'IMAGENAME eq AfterFX.exe'], { reject: false, windowsHide: true, timeout: 15_000 });
     const out = [];
     for (const line of String(r.stdout ?? '').split(/\r?\n/)) {
@@ -42,6 +49,38 @@ export async function listAfterFxProcesses(spawn = execa) {
         out.push({ name: cells[0], pid: Number(cells[1]), title: cells.length >= 9 ? cells[cells.length - 1] : '' });
     }
     return out;
+}
+/** macOS: `afterfx` is the app bundle and scripts go through AppleScript. */
+function isMacBundle(afterfx) {
+    return /\.app\/?$/i.test(afterfx);
+}
+/** AppleScript that runs a JSX file in After Effects and waits for it (AE's own DoScriptFile command). */
+export function doScriptFile(app, jsx, timeoutMs) {
+    const q = (v) => `"${v.replace(/[\\"]/g, (c) => `\\${c}`)}"`;
+    return [
+        `with timeout of ${Math.ceil(timeoutMs / 1000)} seconds`,
+        `  tell application ${q(basename(app).replace(/\.app\/?$/i, ''))} to DoScriptFile ${q(jsx)}`,
+        'end timeout',
+    ].join('\n');
+}
+/** The runner quits AE; wait for that (the next job must not land in a closing AE), then kill leftovers. */
+async function waitForAeExit(list, waitMs) {
+    const until = Date.now() + waitMs;
+    for (;;) {
+        const left = await list().catch(() => []);
+        if (!left.length)
+            return;
+        if (Date.now() >= until) {
+            for (const p of left) {
+                try {
+                    process.kill(p.pid, 'SIGKILL');
+                }
+                catch { /* gone */ }
+            }
+            return;
+        }
+        await new Promise((r) => setTimeout(r, 500));
+    }
 }
 function guiWindows(procs) {
     return procs.filter((p) => p.title && !/^n\/a$/i.test(p.title.trim()));
@@ -73,7 +112,7 @@ export function createAeBackend(tools, opts = {}) {
         if (!tools.afterfx)
             throw new UserActionError('AfterFX not found; install After Effects or set EDITMCP_AE_DIR', ACTIONS.aeNotFound());
         const minRam = opts.minFreeRamGb ?? 0.75;
-        if (os.freemem() / 2 ** 30 < minRam)
+        if (freeRamBytes() / 2 ** 30 < minRam)
             throw new Error(`not enough free RAM for After Effects (need ${minRam} GB)`);
         const tempRoot = os.tmpdir();
         if (!isAscii(tempRoot))
@@ -88,7 +127,16 @@ export function createAeBackend(tools, opts = {}) {
             // Only generated paths are embedded in JSX; user values go through the UTF-8 JSON job.
             await writeFile(launcher, `var EDITMCP_JOB = ${JSON.stringify(jobPath)};\n$.evalFile(new File(${JSON.stringify(runner)}));\n`, 'utf8');
             const timeoutMs = action === 'list' || action === 'version' ? shortTimeout : longTimeout;
-            const child = spawn(tools.afterfx, ['-m', '-noui', '-r', launcher], { reject: false, windowsHide: true, timeout: 0 });
+            const mac = isMacBundle(tools.afterfx);
+            if (mac) {
+                // One AE per Mac user and the runner ends with app.quit(): never run inside the person's open AE.
+                const open = await listProcesses().catch(() => []);
+                if (open.length)
+                    throw new UserActionError(`After Effects is open (PID ${open.map((p) => p.pid).join(', ')})`, ACTIONS.aeCloseMac());
+            }
+            const child = mac
+                ? spawn('osascript', ['-e', doScriptFile(tools.afterfx, launcher, timeoutMs)], { reject: false, timeout: 0 })
+                : spawn(tools.afterfx, ['-m', '-noui', '-r', launcher], { reject: false, windowsHide: true, timeout: 0 });
             let timedOut = false;
             const timer = setTimeout(() => { timedOut = true; void killTree(child.pid, spawn, child); }, timeoutMs);
             let output;
@@ -98,14 +146,20 @@ export function createAeBackend(tools, opts = {}) {
             finally {
                 clearTimeout(timer);
             }
+            if (mac)
+                await waitForAeExit(listProcesses, timedOut ? 0 : opts.macQuitWaitMs ?? 60_000);
             if (timedOut)
                 throw new Error(`AfterFX ${action} timed out after ${timeoutMs} ms (process tree killed)`);
             const report = await readFile(resultPath, 'utf8').catch(() => undefined);
+            const stderr = String(output.stderr ?? '').slice(-500);
+            if (mac && report === undefined && /-1743|not authori[sz]ed/i.test(stderr))
+                throw new UserActionError(`osascript: ${stderr.trim()}`, ACTIONS.macAutomation());
             // No result at all: the runner never got to write one (scripts may not write files, or AE quit
             // at a first-run screen). Both need the person, so say which one instead of a raw error.
             if (report === undefined)
-                throw await noResult(action, output.exitCode, String(output.stderr ?? '').slice(-500));
-            if (output.exitCode !== 0)
+                throw await noResult(action, output.exitCode, stderr);
+            // osascript often fails once AE quits under it (-609): on macOS the result file decides
+            if (!mac && output.exitCode !== 0)
                 throw new Error(`AfterFX failed (${output.exitCode}): ${report}`);
             const result = JSON.parse(report.replace(/^\uFEFF/, ''));
             if (result.ok !== true) {

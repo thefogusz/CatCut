@@ -3,8 +3,9 @@ import { constants } from 'node:fs';
 import { copyFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import os from 'node:os';
-import { createAeBackend, listAfterFxProcesses, lintMockComp, MockAeBackend, type AeProcess } from '../../src/engine/ae.js';
+import { createAeBackend, doScriptFile, listAfterFxProcesses, lintMockComp, MockAeBackend, type AeProcess } from '../../src/engine/ae.js';
 import type { SpawnFn } from '../../src/engine/aerender.js';
+import { UserActionError } from '../../src/core/user-action.js';
 
 const dirs: string[] = [];
 afterEach(async () => { for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true }); });
@@ -323,5 +324,55 @@ describe('MockAeBackend', () => {
     expect(a).not.toBe(b);
     expect((await readFile(a)).subarray(1, 4).toString()).toBe('PNG');
     await expect(ae.previewFrame('x.aep', 'Card', 250, join(dir, 'g.png'))).rejects.toThrow(/past the end/);
+  });
+});
+
+describe('After Effects on macOS (AppleScript DoScriptFile)', () => {
+  const APP = '/Applications/Adobe After Effects 2026/Adobe After Effects 2026.app';
+
+  it('builds an AppleScript that targets the app by name and waits up to the job timeout', () => {
+    const script = doScriptFile(APP, '/tmp/editmcp-ae-x/launch.jsx', 120_500);
+    expect(script).toBe([
+      'with timeout of 121 seconds',
+      '  tell application "Adobe After Effects 2026" to DoScriptFile "/tmp/editmcp-ae-x/launch.jsx"',
+      'end timeout',
+    ].join('\n'));
+    expect(doScriptFile(APP, '/tmp/a"b\\c.jsx', 1000)).toContain('DoScriptFile "/tmp/a\\"b\\\\c.jsx"');
+  });
+
+  it('runs jobs through osascript, trusts the result file over osascript\'s exit code, and waits for AE to quit', async () => {
+    const dir = await mkdtemp(join(os.tmpdir(), 'editmcp-ae-mac-'));
+    dirs.push(dir);
+    let aeOpen = false;
+    const spawn = vi.fn(async (bin: string, args: string[]) => {
+      expect(bin).toBe('osascript');
+      const launcher = /DoScriptFile "(.*)"/.exec(args[1]!)![1]!;
+      const job = JSON.parse(await readFile(JSON.parse((await readFile(launcher, 'utf8')).match(/var EDITMCP_JOB = (.*);/)![1]!), 'utf8'));
+      await writeFile(job.result, JSON.stringify({ ok: true, data: '26.0' }));
+      aeOpen = true;
+      setTimeout(() => { aeOpen = false; }, 30);
+      // AE quitting under osascript: connection invalid (-609), exit 1
+      return { exitCode: 1, stdout: '', stderr: 'execution error: Connection is invalid. (-609)' };
+    });
+    const listProcesses = vi.fn(async (): Promise<AeProcess[]> => (aeOpen ? [{ name: 'After Effects', pid: 4242, title: 'Adobe After Effects 2026' }] : []));
+    const backend = createAeBackend({ ffmpeg: 'ffmpeg', ffprobe: 'ffprobe', afterfx: APP }, { spawn: spawn as unknown as SpawnFn, minFreeRamGb: 0, listProcesses, macQuitWaitMs: 5000 });
+    expect(await backend.version()).toBe('26.0');
+    expect(aeOpen).toBe(false);
+    expect(listProcesses.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it('refuses to run inside an After Effects the person has open, and asks for Automation access when macOS blocks it', async () => {
+    const spawn = vi.fn(async () => ({ exitCode: 1, stdout: '', stderr: 'Not authorized to send Apple events to Adobe After Effects 2026. (-1743)' }));
+    const open = createAeBackend({ ffmpeg: 'ffmpeg', ffprobe: 'ffprobe', afterfx: APP }, {
+      spawn: spawn as unknown as SpawnFn, minFreeRamGb: 0, listProcesses: async () => [{ name: 'After Effects', pid: 7, title: 'Adobe After Effects 2026' }],
+    });
+    const e1 = await open.version().catch((e: unknown) => e);
+    expect(e1).toBeInstanceOf(UserActionError);
+    expect((e1 as UserActionError).userAction.code).toBe('ae-close-mac');
+    expect(spawn).not.toHaveBeenCalled();
+
+    const blocked = createAeBackend({ ffmpeg: 'ffmpeg', ffprobe: 'ffprobe', afterfx: APP }, { spawn: spawn as unknown as SpawnFn, minFreeRamGb: 0, listProcesses: async () => [] });
+    const e2 = await blocked.version().catch((e: unknown) => e);
+    expect((e2 as UserActionError).userAction.code).toBe('mac-automation');
   });
 });

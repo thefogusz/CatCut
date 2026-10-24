@@ -186,4 +186,6 @@ export declare function planTimeline(p: Project, sources: Map<string, Source>, e
     dissolves: DissolvePlan[];
     order: ConcatItem[];
 };
+/** Whether this ffmpeg build has a filter (e.g. `subtitles` needs libass). */
+export declare function hasFilter(ffmpeg: string, name: string): Promise<boolean>;
 export {};

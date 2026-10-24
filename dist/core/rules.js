@@ -13,6 +13,7 @@ import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
+import { labelFontOpt } from './platform.js';
 import { planHash } from './project.js';
 import { framesToTc, splitDissolve } from './timecode.js';
 /** Thrown when a change would override the brief (or remove a brief rule) without the user's go-ahead. */
@@ -540,7 +541,6 @@ function matcher(p, t, shots, warnings) {
     return (s) => s.src === id || sameComp(s.src) || (!a && s.comp === id);
 }
 // ---------- evidence extraction (ffmpeg) ----------
-const WINDOWS_FONT = 'C:/Windows/Fonts/arial.ttf';
 const SHEET_COLUMNS = 4;
 const SHEET_THUMB_WIDTH = 480;
 const FRAME_TIMEOUT_MS = 120_000;
@@ -581,7 +581,8 @@ export async function extractEvidence(tools, p, plan, opts = {}) {
 async function tileFrames(ffmpeg, frames, out, signal) {
     const cols = Math.min(SHEET_COLUMNS, frames.length);
     const rows = Math.ceil(frames.length / cols);
-    const fontOpts = existsSync(WINDOWS_FONT) ? [`fontfile='${WINDOWS_FONT.replace(':', '\\:')}'`, undefined] : [undefined];
+    const labelFont = labelFontOpt();
+    const fontOpts = labelFont ? [labelFont, undefined] : [undefined];
     for (const font of fontOpts) {
         const chains = frames.map((f, i) => {
             // labels are ASCII-only (clip ids sanitised), colons escaped for drawtext

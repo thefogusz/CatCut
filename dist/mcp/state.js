@@ -7,6 +7,7 @@
  */
 import os from 'node:os';
 import { getEnvironment } from '../core/tools.js';
+import { freeRamBytes } from '../core/platform.js';
 /** Environment that never throws: missing ffmpeg becomes a `problems` entry instead. */
 export async function safeEnvironment() {
     try {
@@ -17,7 +18,7 @@ export async function safeEnvironment() {
             tools: { ffmpeg: '', ffprobe: '' },
             encoders: { h264_nvenc: false, h264_qsv: false, hevc_nvenc: false, libx264: false, prores_ks: false, dnxhd: false, mpeg2video: false },
             totalRamGb: os.totalmem() / 2 ** 30,
-            freeRamGb: os.freemem() / 2 ** 30,
+            freeRamGb: freeRamBytes() / 2 ** 30,
             cpuThreads: os.cpus().length,
         };
         return { env, problems: [err instanceof Error ? err.message : String(err)] };

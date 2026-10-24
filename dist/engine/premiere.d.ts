@@ -11,7 +11,7 @@ export interface PremiereSequenceRef {
     active?: boolean;
 }
 export interface PremiereBridgeStatus {
-    /** extension folder present under %APPDATA%\Adobe\CEP\extensions */
+    /** extension folder present under the per-user CEP extensions folder (cepExtensionsDir) */
     installed: boolean;
     installDir: string;
     /** a bridge heartbeat younger than staleMs */
@@ -40,8 +40,12 @@ export interface PremiereClient {
 }
 /** Where bridges before 0.3 kept the queue (cleanup tools empty TEMP, which dropped the bridge). */
 export declare function legacyQueueDir(): string;
-/** %LOCALAPPDATA%\CatCut\bridge (same rule as the bridge's index.html); TEMP only when that path is not ASCII. */
+/**
+ * %LOCALAPPDATA%\CatCut\bridge (~/Library/Application Support/CatCut/bridge on macOS; same rule as the
+ * bridge's index.html); TEMP only when that path is not ASCII.
+ */
 export declare function defaultQueueDir(): string;
+/** Per-user CEP extensions folder: %APPDATA%\Adobe\CEP\extensions or ~/Library/Application Support/Adobe/CEP/extensions. */
 export declare function cepExtensionsDir(): string;
 export declare function createPremiereClient(opts?: {
     queueDir?: string;
@@ -52,7 +56,7 @@ export declare function createPremiereClient(opts?: {
 /** A unique ASCII file in the queue folder for Premiere to read or write. */
 export declare function stagePath(client: PremiereClient, ext: string): Promise<string>;
 export interface PremiereHost {
-    /** "Adobe Premiere Pro.exe" processes running */
+    /** Premiere processes running ("Adobe Premiere Pro.exe" / the macOS app) */
     running(): Promise<number[]>;
     /** CSXS runtimes whose PlayerDebugMode is not 1 (CatCut's unsigned bridge would not load there) */
     debugModeMissing(): Promise<string[]>;
@@ -123,6 +127,7 @@ export declare function installBridge(opts?: {
     source?: string;
     extensionsDir?: string;
     backupRoot?: string;
+    platform?: NodeJS.Platform;
 }): Promise<InstallResult>;
 /** Removes the extension folder (PlayerDebugMode stays: other unsigned extensions may need it). */
 export declare function uninstallBridge(opts?: {

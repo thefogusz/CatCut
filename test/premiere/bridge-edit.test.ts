@@ -7,7 +7,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
-import { basename, join } from 'node:path';
+import { basename, join, win32 } from 'node:path';
 import vm from 'node:vm';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as projectApi from '../../src/core/project.js';
@@ -46,7 +46,8 @@ function fakePremiere(projectPath: string) {
   let nextNode = 1;
   const items: Item[] = [];
   const bins: string[] = [];
-  const mkItem = (media: string, name = basename(media), hasAudio = true, durSec = 100): Item => { const it = { type: 1, name, nodeId: String(nextNode++), media, durSec, hasAudio }; items.push(it); return it; };
+  // fixtures use Windows media paths: win32.basename splits on both separators on every OS
+  const mkItem = (media: string, name = win32.basename(media), hasAudio = true, durSec = 100): Item => { const it = { type: 1, name, nodeId: String(nextNode++), media, durSec, hasAudio }; items.push(it); return it; };
   const video: Clip[][] = [[], [], []];
   const audio: Clip[][] = [[], []];
   const saves: string[] = [];
@@ -268,11 +269,16 @@ describe('host.jsx: premiere_edit ops', () => {
 const pumps: NodeJS.Timeout[] = [];
 afterEach(() => { pumps.splice(0).forEach(clearInterval); });
 const envBackup = { ...process.env };
-afterEach(() => { process.env['LOCALAPPDATA'] = envBackup['LOCALAPPDATA']; process.env['TEMP'] = envBackup['TEMP']; process.env['TMP'] = envBackup['TMP']; });
+afterEach(() => {
+  for (const k of ['LOCALAPPDATA', 'TEMP', 'TMP', 'TMPDIR', 'HOME']) {
+    if (envBackup[k] === undefined) delete process.env[k]; else process.env[k] = envBackup[k];
+  }
+});
 
 async function live() {
   const root = await tmp();
   process.env['LOCALAPPDATA'] = join(root, 'local');
+  process.env['HOME'] = join(root, 'home');
   const queue = join(root, 'q'); await mkdir(queue);
   const projectPath = join(root, 'งาน.prproj'); await writeFile(projectPath, 'v1');
   const prem = fakePremiere(projectPath);
@@ -359,10 +365,12 @@ describe('bridge compatibility and resilience', () => {
   it('by default the client talks to %LOCALAPPDATA%\\CatCut\\bridge, and still finds an old bridge in TEMP', async () => {
     const root = await tmp();
     process.env['LOCALAPPDATA'] = join(root, 'local');
-    process.env['TEMP'] = join(root, 'temp'); process.env['TMP'] = join(root, 'temp');
+    process.env['HOME'] = join(root, 'home');
+    process.env['TEMP'] = join(root, 'temp'); process.env['TMP'] = join(root, 'temp'); process.env['TMPDIR'] = join(root, 'temp');
     await mkdir(join(root, 'temp', 'catcut-premiere-bridge'), { recursive: true });
     const c = createPremiereClient({ installDir: join(root, 'none') });
-    expect(c.queueDir).toBe(join(root, 'local', 'CatCut', 'bridge'));
+    // macOS: ~/Library/Application Support/CatCut/bridge (same rule as the bridge's index.html)
+    expect(c.queueDir).toBe(process.platform === 'darwin' ? join(root, 'home', 'Library', 'Application Support', 'CatCut', 'bridge') : join(root, 'local', 'CatCut', 'bridge'));
     await writeFile(join(root, 'temp', 'catcut-premiere-bridge', 'bridge.json'), JSON.stringify({ protocol: 1, pid: 1, ts: Date.now(), bridge: '0.1.0' }));
     expect(await c.status()).toMatchObject({ connected: true, bridge: '0.1.0', queueDir: join(root, 'temp', 'catcut-premiere-bridge') });
   });

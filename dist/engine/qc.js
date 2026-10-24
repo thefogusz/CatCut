@@ -16,6 +16,7 @@ import { execa } from 'execa';
 import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
+import { labelFontOpt } from '../core/platform.js';
 import { framesToTc } from '../core/timecode.js';
 // Detector thresholds (DESIGN.md §5.4 / module contract).
 const BLACK_MIN_SEC = 0.2;
@@ -36,7 +37,6 @@ const DUP_FRAC = 0.33;
 const SHEET_COLUMNS = 6;
 const SHEET_THUMB_WIDTH = 320;
 const SHEET_TARGET_THUMBS = 36;
-const WINDOWS_FONT = 'C:/Windows/Fonts/arial.ttf';
 /** Spawn with a timeout; a timeout or abort kills the child (ffmpeg has no grandchildren) and throws. */
 async function run(file, args, ctx) {
     const r = await execa(file, args, {
@@ -369,8 +369,9 @@ async function contactSheet(tools, path, outPath, frames, fps, ctx) {
     const thumbs = Math.ceil(frames / step);
     const rows = Math.max(1, Math.ceil(thumbs / SHEET_COLUMNS));
     const fontOpts = [];
-    if (existsSync(WINDOWS_FONT))
-        fontOpts.push(`fontfile='${WINDOWS_FONT.replace(':', '\\:')}'`);
+    const labelFont = labelFontOpt();
+    if (labelFont)
+        fontOpts.push(labelFont);
     fontOpts.push('font=Sans', undefined);
     let lastErr = '';
     for (const fontOpt of fontOpts) {

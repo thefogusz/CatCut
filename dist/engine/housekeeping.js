@@ -11,6 +11,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import { lstat, mkdir, opendir, readdir, readFile, rename, rmdir, statfs as fsStatfs, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { hashJson } from '../core/hash.js';
+import { adobePrefsDir } from '../core/platform.js';
 import { isProtected } from '../core/project.js';
 const GB = 1024 ** 3;
 const DISK_ERROR_BYTES = 5 * GB;
@@ -20,9 +21,13 @@ const MIN_AGE_MS = 60 * 60_000; // orphan/temp files younger than this may belon
 const CONFIRM_TOKENS = new Set(['ลบ', 'delete']);
 /** Project folder size that earns a warning in disk_report (the reshoot job reached ~100 GB unnoticed). */
 const DEFAULT_BUDGET_GB = 50;
+/** Windows absolute path ("D:\\job", "\\\\server\\share"). */
+const WIN_ABS = /^(?:[A-Za-z]:[\\/]|\\\\)/;
 async function freeSpace(target, statfs) {
-    let p = path.resolve(target);
-    while (!existsSync(p)) {
+    // a Windows-style path on another OS is passed as is (statfs reports it unreadable), never resolved against cwd
+    const foreign = process.platform !== 'win32' && WIN_ABS.test(target);
+    let p = foreign ? target : path.resolve(target);
+    while (!foreign && !existsSync(p)) {
         const up = path.dirname(p);
         if (up === p)
             break;
@@ -32,8 +37,12 @@ async function freeSpace(target, statfs) {
     const bsize = Number(s.bsize);
     return { free: Number(s.bavail) * bsize, total: Number(s.blocks) * bsize };
 }
+/** Drive a path lives on: "C:\\" for Windows-style paths (on any OS), the volume ("/Volumes/X/") or "/" on macOS. */
 function driveRoot(p) {
-    return path.parse(path.resolve(p)).root.toUpperCase();
+    if (WIN_ABS.test(p) || process.platform === 'win32')
+        return path.win32.parse(path.win32.resolve(p)).root.toUpperCase();
+    const abs = path.resolve(p);
+    return /^\/Volumes\/[^/]+/.exec(abs)?.[0].concat('/') ?? path.parse(abs).root;
 }
 /** Parse an AE "Prefs*.txt": sections `["Name"]`, entries `"Key" = "value"`, long strings continued with `"\`. */
 export function parseAePrefs(text) {
@@ -63,12 +72,13 @@ export function parseAePrefs(text) {
 function versionKey(v) {
     return v.split('.').map((x) => parseInt(x, 10) || 0);
 }
-/** AE prefs version folders under %APPDATA%, newest first, with their "*Prefs*.txt" files. */
+/** AE prefs version folders under %APPDATA% (or ~/Library/Preferences on macOS), newest first, with their "*Prefs*.txt" files. */
 async function aePrefsDirs(env) {
     const appdata = env['APPDATA'];
-    if (!appdata)
+    const adobe = appdata ? path.join(appdata, 'Adobe') : process.platform === 'darwin' && env['HOME'] ? adobePrefsDir(env, 'darwin', env['HOME']) : undefined;
+    if (!adobe)
         return [];
-    const root = path.join(appdata, 'Adobe', 'After Effects');
+    const root = path.join(adobe, 'After Effects');
     const versions = (await readdir(root).catch(() => [])).filter((v) => /^\d+(\.\d+)*$/.test(v))
         .sort((a, b) => { const x = versionKey(a); const y = versionKey(b); for (let i = 0; i < Math.max(x.length, y.length); i++) {
         const d = (y[i] ?? 0) - (x[i] ?? 0);
@@ -95,7 +105,7 @@ export async function aeScriptingPref(env = process.env) {
     }
     return {};
 }
-/** AE disk cache folder from the newest AE prefs under %APPDATA%; default %LOCALAPPDATA%\Temp; else unknown. */
+/** AE disk cache folder from the newest AE prefs; default %LOCALAPPDATA%\Temp (~/Library/Caches on macOS); else unknown. */
 export async function findAeDiskCache(env = process.env) {
     for (const { ver, dir, files } of await aePrefsDirs(env)) {
         for (const f of files) {
@@ -126,6 +136,10 @@ export async function findAeDiskCache(env = process.env) {
     const local = env['LOCALAPPDATA'];
     if (local && existsSync(path.join(local, 'Temp')))
         return { folder: path.join(local, 'Temp'), source: 'default' };
+    // macOS default: ~/Library/Caches/Adobe/After Effects/<ver>/Disk Cache…
+    const caches = env['HOME'] ? path.join(env['HOME'], 'Library', 'Caches') : undefined;
+    if (!local && caches && process.platform === 'darwin' && existsSync(caches))
+        return { folder: caches, source: 'default' };
     return { source: 'unknown' };
 }
 /** The "Disk Cache - <host>.noindex" folders AE creates under the configured folder (never the whole Temp). */

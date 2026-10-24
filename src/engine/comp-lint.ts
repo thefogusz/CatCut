@@ -5,6 +5,7 @@
  */
 import { execa } from 'execa';
 import { readdir } from 'node:fs/promises';
+import os from 'node:os';
 import { basename, extname, join, resolve } from 'node:path';
 import { clipStartFrames } from '../core/project.js';
 import type { AeBackend, CompLint, Frames, Project, QcIssue, StyleRules } from '../core/types.js';
@@ -153,6 +154,16 @@ export interface FontSources {
   /** file names in a directory ([] when missing) */
   readDir?: (dir: string) => Promise<string[]>;
   env?: Record<string, string | undefined>;
+  /** which OS's font folders to scan (default: this one) */
+  platform?: NodeJS.Platform;
+}
+
+/** macOS font folders (user, local, system, Adobe's own). Fonts in subfolders (Supplemental) are listed too. */
+function macFontDirs(home: string): string[] {
+  return [
+    join(home, 'Library', 'Fonts'), '/Library/Fonts', '/System/Library/Fonts', '/System/Library/Fonts/Supplemental',
+    '/Library/Application Support/Adobe/Fonts',
+  ];
 }
 
 const FONT_KEYS = [
@@ -181,7 +192,7 @@ async function defaultReadDir(dir: string): Promise<string[]> {
   try { return await readdir(dir); } catch { return []; }
 }
 
-/** Fonts Windows (and AE's own Adobe Fonts folder) can see: HKLM/HKCU registry + font folders. */
+/** Fonts the OS (and AE's own Adobe Fonts folder) can see: HKLM/HKCU registry + font folders on Windows, font folders on macOS. */
 export async function listInstalledFonts(src: FontSources = {}): Promise<InstalledFonts> {
   const env = src.env ?? process.env;
   const regQuery = src.regQuery ?? defaultRegQuery;
@@ -196,7 +207,7 @@ export async function listInstalledFonts(src: FontSources = {}): Promise<Install
       if (r.file) names.push(basename(r.file, extname(r.file)));
     }
   }
-  const dirs = [
+  const dirs = (src.platform ?? process.platform) === 'darwin' ? macFontDirs(env['HOME'] ?? os.homedir()) : [
     join(env['WINDIR'] ?? env['SystemRoot'] ?? 'C:\\Windows', 'Fonts'),
     ...(env['LOCALAPPDATA'] ? [join(env['LOCALAPPDATA'], 'Microsoft', 'Windows', 'Fonts')] : []),
     join(env['CommonProgramFiles'] ?? 'C:\\Program Files\\Common Files', 'Adobe', 'Fonts'),

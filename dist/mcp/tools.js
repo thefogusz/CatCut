@@ -20,6 +20,9 @@ import { compsNeedingRender, isAeComp, requireFfmpeg, requireProject } from './s
 import { fail, ok, tool, ToolError } from './tooldef.js';
 import { EXTRA_TOOLS } from './tools-extra.js';
 import { createPremiereClient } from '../engine/premiere.js';
+import { hasFilter } from '../engine/ffmpeg.js';
+import { findWhisper, modelsDir } from '../engine/transcribe.js';
+import { freeRamBytes } from '../core/platform.js';
 /** Tools that change the project while a build/deliver/review job may be using it. */
 const MUTATING = new Set(['project_new', 'project_open', 'asset_add', 'timeline_set', 'timeline_edit', 'audio_add', 'ae_edit', 'import_premiere_xml', 'timeline_restore']);
 /** Tools that write into the open project's folder. */
@@ -183,6 +186,13 @@ function isInside(child, parent) {
 function assertWritable(target, what) {
     if (isProtected(target))
         throw new ToolError(`ห้ามเขียนในโฟลเดอร์ที่ป้องกันไว้ / refusing to write ${what} inside a protected path`, { path: target });
+}
+/** A Windows path ("D:\\job") off Windows would become a folder literally named "D:\\job" in the current directory. */
+function nativeDir(p) {
+    if (!WIN && /^(?:[A-Za-z]:[\\/]|\\\\)/.test(p)) {
+        throw new ToolError(`path ของ Windows ใช้บนเครื่องนี้ไม่ได้ / a Windows path cannot be used on ${process.platform}: ${p}`, { path: p });
+    }
+    return resolve(p);
 }
 /** AE outputs must land inside the open project or next to (below the folder of) the source .aep. */
 function assertConfined(state, target, aep, what) {
@@ -587,7 +597,9 @@ function projectStatus(state, p) {
     };
 }
 const COMPAT_NOTES = [
-    'AE headless = AfterFX.com -m -noui -r <jsx>: ต้องมี -m เสมอ ไม่งั้นสคริปต์จะไปรันใน AE ที่เปิดอยู่ (DESIGN §2.1)',
+    process.platform === 'darwin'
+        ? 'AE บน macOS ไม่มี -noui: CatCut สั่งผ่าน AppleScript (DoScriptFile) เปิด AE ของตัวเองแล้วปิดเมื่อเสร็จ — ต้องปิด AE ที่เปิดอยู่ก่อน และอนุญาต Automation ครั้งแรก'
+        : 'AE headless = AfterFX.com -m -noui -r <jsx>: ต้องมี -m เสมอ ไม่งั้นสคริปต์จะไปรันใน AE ที่เปิดอยู่ (DESIGN §2.1)',
     'AE 25.2.2–26.3: ชื่อไฟล์ output ภาษาไทยจากสคริปต์กลายเป็นขีด → render ชื่อ ASCII แล้ว rename (DESIGN §2.1)',
     'saveFrameToPng ไม่เสถียร → preview frame ใช้ aerender -s N -e N (DESIGN §2.1)',
     'OutputModule.setSettings เปลี่ยน Format ไม่ได้ → ต้องมี OM template "EDITMCP ProRes 422 HQ" หรือ fallback Lossless + ffmpeg (DESIGN §2.1, §12)',
@@ -611,7 +623,8 @@ const CORE_TOOLS = [
             targets: z.array(z.string()).optional().describe('delivery target ids (see delivery_presets)'),
         },
         handler: async (a, state) => {
-            const dir = resolve(a.dir);
+            assertWritable(a.dir, 'project_new.dir');
+            const dir = nativeDir(a.dir);
             assertWritable(dir, 'project_new.dir');
             const unknown = (a.targets ?? []).filter((t) => !PRESETS[t]);
             if (unknown.length)
@@ -1190,7 +1203,7 @@ const CORE_TOOLS = [
         input: {},
         handler: async (_a, state) => {
             const env = state.env;
-            const freeRamGb = os.freemem() / 2 ** 30;
+            const freeRamGb = freeRamBytes() / 2 ** 30;
             let aeVersion = 'unknown (not launched)';
             if (process.env['EDITMCP_ALLOW_AE'] === '1' && env.tools.afterfx) {
                 try {
@@ -1224,6 +1237,15 @@ const CORE_TOOLS = [
                     return st.installed ? 'installed, Premiere closed (fine: premiere_open starts it with the project)' : 'not installed (optional; `catcut premiere-bridge install` for premiere_* tools without computer use)';
                 })(),
                 effectcraft: env.tools.effectcraftCli ? 'found (optional; .ecproj comps: ae_create / build render them headless)' : 'not found (optional)',
+                captions: await (async () => {
+                    const w = findWhisper();
+                    const libass = env.tools.ffmpeg ? await hasFilter(env.tools.ffmpeg, 'subtitles') : false;
+                    const parts = [
+                        libass ? 'burn-in ok (libass)' : 'no libass: captions/text cannot be burned (macOS: brew install ffmpeg-full)',
+                        w.cli ? `whisper ${w.model ? basename(w.model) : `has no model (put ggml-*.bin in ${modelsDir()})`}` : 'whisper-cli not found (transcribe unavailable)',
+                    ];
+                    return parts.join(' · ');
+                })(),
                 problems: state.problems,
                 compat: COMPAT_NOTES,
                 project: state.project ? { name: state.project.meta.name, dir: state.project.dir } : null,

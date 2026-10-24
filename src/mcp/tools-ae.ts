@@ -164,7 +164,7 @@ export const AE_TOOLS: ToolDef[] = [
     description: 'ล้าง cache ของ After Effects (app.purge ALL_CACHES ในอินสแตนซ์ headless); ifBelowGb = ล้างเฉพาะเมื่อไดรฟ์ cache เหลือน้อยกว่านี้ (job) · Purge AE caches (job)',
     input: {
       ifBelowGb: z.number().positive().optional().describe('only purge when the AE cache drive has less free space than this'),
-      cacheDir: z.string().optional().describe('folder on the AE disk-cache drive (default EDITMCP_AE_CACHE_DIR or %LOCALAPPDATA%)'),
+      cacheDir: z.string().optional().describe('folder on the AE disk-cache drive (default EDITMCP_AE_CACHE_DIR, else %LOCALAPPDATA% / ~/Library/Caches)'),
     },
     handler: async (a, state) => {
       if (!state.ae.purgeCaches) throw new ToolError('backend นี้ล้าง cache ไม่ได้ / this AE backend cannot purge caches');

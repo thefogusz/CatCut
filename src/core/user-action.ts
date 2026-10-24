@@ -61,16 +61,35 @@ export const ACTIONS = {
     code: 'ae-allow-scripts', app: 'after-effects', title: 'อนุญาตให้สคริปต์เขียนไฟล์ใน After Effects',
     steps: [
       'เปิด After Effects',
-      'Edit > Preferences > Scripting & Expressions',
+      process.platform === 'darwin' ? 'After Effects > Settings > Scripting & Expressions' : 'Edit > Preferences > Scripting & Expressions',
       'ติ๊ก "Allow Scripts to Write Files and Access Network" แล้วกด OK',
       'ปิด After Effects (ไม่ต้องสร้างหรือ Save โปรเจกต์)',
     ],
     why: 'CatCut ส่งผลงานจาก AE กลับมาเป็นไฟล์ ถ้าไม่ติ๊ก งาน AE ทุกงานจะล้มด้วย "cannot write"',
     frequency: 'once', keepOpen: false, closeAfter: 'ทันทีที่กด OK', needsProject: false,
   }),
+  aeCloseMac: (): UserAction => ({
+    code: 'ae-close-mac', app: 'after-effects', title: 'ปิด After Effects ก่อน',
+    steps: ['Save งานใน After Effects ถ้ามี', 'ปิด After Effects (Cmd+Q)', 'บอก AI ว่า "ปิด AE แล้ว" แล้ว CatCut จะลองใหม่เอง'],
+    why: 'บน Mac เปิด AE ได้ทีละตัว CatCut จึงต้องเปิด AE ของตัวเองแล้วปิดเมื่อเสร็จ ถ้าใช้ตัวที่คุณเปิดอยู่ งานของคุณอาจถูกปิดไปด้วย',
+    frequency: 'each-time', keepOpen: false, closeAfter: 'CatCut ปิด AE ให้เองเมื่องานเสร็จ', needsProject: false,
+  }),
+  macAutomation: (): UserAction => ({
+    code: 'mac-automation', app: 'after-effects', title: 'อนุญาตให้สั่งงาน After Effects (macOS)',
+    steps: [
+      'เปิด System Settings > Privacy & Security > Automation',
+      'หาแอปที่รัน CatCut (Claude, Terminal หรือ Codex) แล้วเปิดสวิตช์ "Adobe After Effects"',
+      'บอก AI ว่า "อนุญาตแล้ว" แล้ว CatCut จะลองใหม่เอง',
+    ],
+    why: 'บน Mac CatCut สั่ง AE ผ่าน AppleScript ซึ่ง macOS ต้องให้คุณอนุญาตก่อน',
+    frequency: 'once', keepOpen: false, closeAfter: 'ไม่ต้องเปิด AE', needsProject: false,
+  }),
   ffmpegMissing: (o: Opts = {}): UserAction => ({
     code: 'ffmpeg-missing', app: 'ffmpeg', title: 'ไม่พบ ffmpeg',
-    steps: ['ติดตั้งใหม่ด้วย install.cmd ของ CatCut (มี ffmpeg มาด้วย)', 'หรือตั้ง EDITMCP_FFMPEG / EDITMCP_FFPROBE ให้ชี้ไปที่ไฟล์'],
+    steps: [
+      process.platform === 'darwin' ? 'ติดตั้งด้วย Homebrew: `brew install ffmpeg` (หรือรัน install.sh ของ CatCut)' : 'ติดตั้งใหม่ด้วย install.cmd ของ CatCut (มี ffmpeg มาด้วย)',
+      'หรือตั้ง EDITMCP_FFMPEG ให้ชี้ไปที่โฟลเดอร์ของ ffmpeg',
+    ],
     why: `ทุกการตัดต่อ ประกอบไฟล์ และส่งออกใช้ ffmpeg${o['detail'] ? ` (${o['detail']})` : ''}`,
     frequency: 'once', keepOpen: false, closeAfter: '-', needsProject: false,
   }),

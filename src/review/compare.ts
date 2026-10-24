@@ -8,6 +8,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readdir, realpath, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import { basename, dirname, extname, isAbsolute, join, relative } from 'node:path';
+import { labelFontOpt } from '../core/platform.js';
 import { framesToTc } from '../core/timecode.js';
 import type { Frames, Project, ReviewPlan, ToolPaths, Version } from '../core/types.js';
 import { ReviewError, versionPlan } from './session.js';
@@ -119,7 +120,6 @@ export interface CompareSheetResult {
 }
 
 const THUMB_W = 480;
-const WINDOWS_FONT = 'C:/Windows/Fonts/arial.ttf';
 
 async function run(file: string, args: string[], timeoutMs: number, signal?: AbortSignal): Promise<{ exitCode: number; stderr: string }> {
   const r = await execa(file, args, { reject: false, windowsHide: true, stdin: 'ignore', timeout: timeoutMs, cancelSignal: signal, forceKillAfterDelay: 2000, maxBuffer: 16 * 2 ** 20 });
@@ -173,7 +173,8 @@ export async function renderCompareSheet(opts: {
     const tc = (f: Frames) => framesToTc(f, a.plan.fps).replace(/:/g, '\\:');
     const label = (font: string, text: string) => `,drawtext=${font}:fontsize=18:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=4:x=8:y=8:text='${text}'`;
     const fonts: Array<string | undefined> = [];
-    if (existsSync(WINDOWS_FONT)) fonts.push(`fontfile='${WINDOWS_FONT.replace(':', '\\:')}'`);
+    const labelFont = labelFontOpt();
+    if (labelFont) fonts.push(labelFont);
     fonts.push('font=Sans', undefined);
     let lastErr = '';
     for (const font of fonts) {

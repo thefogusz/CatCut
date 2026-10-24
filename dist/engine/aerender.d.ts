@@ -7,7 +7,7 @@
  * - Never overwrites: an existing target gets a `_2`, `_3`… suffix.
  * - Every process spawn goes through an injectable `spawn` (default: execa) so tests
  *   can fake aerender while still running real ffmpeg/ffprobe.
- * - Timeout / abort → the whole process tree is killed (taskkill /T /F on Windows).
+ * - Timeout / abort → the whole process tree is killed (taskkill /T /F on Windows, ps + SIGKILL elsewhere).
  * - Refuses to start when the output or AE-cache drive is nearly full; retries once when aerender
  *   crashes before rendering its first frame (never after a timeout or abort).
  */
@@ -73,7 +73,7 @@ export interface DiskStat {
 export type StatfsFn = (path: string) => Promise<DiskStat>;
 /** Free bytes on the volume holding `path` (or its nearest existing ancestor). */
 export declare function freeDiskBytes(path: string, statfs?: StatfsFn): Promise<number>;
-/** Folder on the drive AE's disk cache uses: EDITMCP_AE_CACHE_DIR, else %LOCALAPPDATA% (AE's default lives under it). */
+/** Folder on the drive AE's disk cache uses: EDITMCP_AE_CACHE_DIR, else %LOCALAPPDATA% / ~/Library/Caches (AE's default lives under it). */
 export declare function defaultAeCacheDir(): string;
 /** ProRes 422 HQ ≈ 0.45 byte/pixel/frame; the Lossless fallback writes ~4 bytes/pixel before the transcode. */
 export declare function estimateOutputBytes(frames: Frames, width?: number, height?: number, fallback?: boolean): number;

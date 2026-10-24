@@ -7465,9 +7465,9 @@ var require_utils = __commonJS({
       let output = "";
       for (let i2 = 0; i2 < input.length; i2++) {
         if (input[i2] === "%" && i2 + 2 < input.length) {
-          const hex = input.slice(i2 + 1, i2 + 3);
-          if (isHexPair(hex)) {
-            const normalizedHex = hex.toUpperCase();
+          const hex2 = input.slice(i2 + 1, i2 + 3);
+          if (isHexPair(hex2)) {
+            const normalizedHex = hex2.toUpperCase();
             const decoded = String.fromCharCode(parseInt(normalizedHex, 16));
             if (decodeUnreserved && isUnreserved(decoded)) {
               output += decoded;
@@ -7487,9 +7487,9 @@ var require_utils = __commonJS({
       for (let i2 = 0; i2 < input.length; i2++) {
         const ch = input[i2];
         if (ch === "%" && i2 + 2 < input.length) {
-          const hex = input.slice(i2 + 1, i2 + 3);
-          if (isHexPair(hex)) {
-            const normalizedHex = hex.toUpperCase();
+          const hex2 = input.slice(i2 + 1, i2 + 3);
+          if (isHexPair(hex2)) {
+            const normalizedHex = hex2.toUpperCase();
             const decoded = String.fromCharCode(parseInt(normalizedHex, 16));
             if (decoded !== "." && isUnreserved(decoded)) {
               output += decoded;
@@ -7529,9 +7529,9 @@ var require_utils = __commonJS({
       for (let i2 = 0; i2 < input.length; i2++) {
         const ch = input[i2];
         if (ch === "%" && i2 + 2 < input.length) {
-          const hex = input.slice(i2 + 1, i2 + 3);
-          if (isHexPair(hex)) {
-            output += "%" + hex.toUpperCase();
+          const hex2 = input.slice(i2 + 1, i2 + 3);
+          if (isHexPair(hex2)) {
+            output += "%" + hex2.toUpperCase();
             i2 += 2;
             continue;
           }
@@ -7567,9 +7567,9 @@ var require_utils = __commonJS({
       for (let i2 = 0; i2 < input.length; i2++) {
         const ch = input[i2];
         if (ch === "%" && i2 + 2 < input.length) {
-          const hex = input.slice(i2 + 1, i2 + 3);
-          if (isHexPair(hex)) {
-            output += "%" + hex.toUpperCase();
+          const hex2 = input.slice(i2 + 1, i2 + 3);
+          if (isHexPair(hex2)) {
+            output += "%" + hex2.toUpperCase();
             i2 += 2;
             continue;
           }
@@ -7614,9 +7614,9 @@ var require_utils = __commonJS({
       for (let i2 = 0; i2 < input.length; i2++) {
         const ch = input[i2];
         if (ch === "%" && i2 + 2 < input.length) {
-          const hex = input.slice(i2 + 1, i2 + 3);
-          if (isHexPair(hex)) {
-            const normalizedHex = hex.toUpperCase();
+          const hex2 = input.slice(i2 + 1, i2 + 3);
+          if (isHexPair(hex2)) {
+            const normalizedHex = hex2.toUpperCase();
             const decoded = String.fromCharCode(parseInt(normalizedHex, 16));
             if (isUnreserved(decoded)) {
               output += decoded;
@@ -7654,9 +7654,9 @@ var require_utils = __commonJS({
       let output = "";
       for (let i2 = 0; i2 < input.length; i2++) {
         if (input[i2] === "%" && i2 + 2 < input.length) {
-          const hex = input.slice(i2 + 1, i2 + 3);
-          if (isHexPair(hex)) {
-            output += "%" + hex.toUpperCase();
+          const hex2 = input.slice(i2 + 1, i2 + 3);
+          if (isHexPair(hex2)) {
+            output += "%" + hex2.toUpperCase();
             i2 += 2;
             continue;
           }
@@ -19571,89 +19571,186 @@ var init_execa = __esm({
   }
 });
 
-// src/core/tools.ts
-import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+// src/core/platform.ts
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import os from "node:os";
-function firstExisting(cands) {
-  return cands.find((p) => p && existsSync(p));
+import { join } from "node:path";
+function exe(name, platform2 = process.platform) {
+  return platform2 === "win32" ? `${name}.exe` : name;
 }
-function findFfmpeg() {
-  const envDir = process.env["EDITMCP_FFMPEG"];
-  const cands = [];
-  if (envDir) cands.push(join(envDir, "ffmpeg.exe"), envDir);
-  for (const dir of (process.env["PATH"] ?? "").split(";")) {
-    if (dir) cands.push(join(dir, "ffmpeg.exe"));
-  }
-  try {
-    for (const pkg of readdirSync(WINGET_FFMPEG_GLOB)) {
-      if (!/ffmpeg/i.test(pkg)) continue;
-      const pkgDir = join(WINGET_FFMPEG_GLOB, pkg);
-      for (const sub of readdirSync(pkgDir)) {
-        cands.push(join(pkgDir, sub, "bin", "ffmpeg.exe"));
-      }
-    }
-  } catch {
-  }
-  const ffmpeg = firstExisting(cands);
-  if (!ffmpeg) return void 0;
-  const ffprobe = ffmpeg.replace(/ffmpeg(\.exe)?$/i, "ffprobe$1");
-  return existsSync(ffprobe) ? { ffmpeg, ffprobe } : void 0;
+function pathDirs(env = process.env, platform2 = process.platform) {
+  return (env["PATH"] ?? "").split(platform2 === "win32" ? ";" : ":").filter(Boolean);
 }
-function findAfterEffects() {
-  const envDir = process.env["EDITMCP_AE_DIR"];
-  const roots = [envDir, "C:\\Program Files\\Adobe"].filter(Boolean);
-  const dirs = [];
-  for (const root of roots) {
+function localAppDataDir(env = process.env, platform2 = process.platform, home = os.homedir()) {
+  if (platform2 === "win32") return env["LOCALAPPDATA"] ?? join(home, "AppData", "Local");
+  if (platform2 === "darwin") return join(home, "Library", "Application Support");
+  return env["XDG_DATA_HOME"] ?? join(home, ".local", "share");
+}
+function adobePrefsDir(env = process.env, platform2 = process.platform, home = os.homedir()) {
+  if (platform2 === "win32") return env["APPDATA"] ? join(env["APPDATA"], "Adobe") : void 0;
+  if (platform2 === "darwin") return join(home, "Library", "Preferences", "Adobe");
+  return void 0;
+}
+function adobeAppRoots(env = process.env, platform2 = process.platform) {
+  if (platform2 === "win32") return [join(env["ProgramFiles"] ?? "C:\\Program Files", "Adobe")];
+  if (platform2 === "darwin") return ["/Applications"];
+  return [];
+}
+function labelFontOpt(platform2 = process.platform) {
+  const file = (LABEL_FONTS[platform2] ?? []).find((f) => existsSync(f));
+  return file ? `fontfile='${file.replace(/:/g, "\\:")}'` : void 0;
+}
+async function listPosixProcesses(run6 = execa) {
+  const r = await run6("ps", ["-axww", "-o", "pid=,ppid=,comm="], { reject: false, timeout: 15e3 });
+  const out2 = [];
+  for (const line of String(r.stdout ?? "").split(/\r?\n/)) {
+    const m = /^\s*(\d+)\s+(\d+)\s+(.+?)\s*$/.exec(line);
+    if (m) out2.push({ pid: Number(m[1]), ppid: Number(m[2]), command: m[3] });
+  }
+  return out2;
+}
+function ownTree(pid, procs, parent = process.pid) {
+  if (!procs.some((p) => p.pid === pid && p.ppid === parent)) return [];
+  return descendants(pid, procs);
+}
+function descendants(pid, procs) {
+  const out2 = [];
+  const visit = (p) => {
+    for (const c3 of procs) if (c3.ppid === p && c3.pid !== p) visit(c3.pid);
+    out2.push(p);
+  };
+  visit(pid);
+  return out2;
+}
+function isBundleProcess(command, appNamePattern) {
+  const m = /\/([^/]+)\.app\/Contents\/MacOS\/[^/]+$/.exec(command);
+  return !!m && appNamePattern.test(m[1]);
+}
+function parseVmStat(out2) {
+  const page = Number(/page size of (\d+) bytes/.exec(out2)?.[1]);
+  if (!page) return void 0;
+  const pages = (name) => Number(new RegExp(`^Pages ${name}:\\s+(\\d+)`, "m").exec(out2)?.[1] ?? 0);
+  return (pages("free") + pages("inactive") + pages("speculative") + pages("purgeable")) * page;
+}
+function freeRamBytes(platform2 = process.platform) {
+  if (platform2 === "darwin") {
     try {
-      if (envDir && root === envDir) {
-        dirs.push(root);
-        continue;
-      }
-      for (const d of readdirSync(root)) if (/^Adobe After Effects \d{4}$/i.test(d)) dirs.push(join(root, d));
+      const n2 = parseVmStat(execFileSync("vm_stat", { encoding: "utf8", timeout: 5e3 }));
+      if (n2 !== void 0) return n2;
     } catch {
     }
   }
-  dirs.sort().reverse();
+  return os.freemem();
+}
+var LABEL_FONTS;
+var init_platform = __esm({
+  "src/core/platform.ts"() {
+    "use strict";
+    init_execa();
+    LABEL_FONTS = {
+      win32: ["C:/Windows/Fonts/arial.ttf"],
+      darwin: ["/System/Library/Fonts/Supplemental/Arial.ttf", "/Library/Fonts/Arial.ttf", "/System/Library/Fonts/Helvetica.ttc"],
+      linux: ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]
+    };
+  }
+});
+
+// src/core/tools.ts
+import { existsSync as existsSync2, readdirSync } from "node:fs";
+import { basename, dirname, join as join2 } from "node:path";
+import os2 from "node:os";
+function firstExisting(cands) {
+  return cands.find((p) => p && existsSync2(p));
+}
+function findFfmpeg() {
+  const name = exe("ffmpeg");
+  const envDir = process.env["EDITMCP_FFMPEG"];
+  const cands = [];
+  if (envDir) cands.push(join2(envDir, name));
+  if (process.platform === "darwin") cands.push(...BREW_FULL.map((d) => join2(d, name)));
+  for (const dir of pathDirs()) cands.push(join2(dir, name));
+  if (process.platform === "win32") {
+    try {
+      for (const pkg of readdirSync(WINGET_FFMPEG_GLOB)) {
+        if (!/ffmpeg/i.test(pkg)) continue;
+        const pkgDir = join2(WINGET_FFMPEG_GLOB, pkg);
+        for (const sub of readdirSync(pkgDir)) {
+          cands.push(join2(pkgDir, sub, "bin", name));
+        }
+      }
+    } catch {
+    }
+  } else {
+    for (const dir of BREW_BINS) cands.push(join2(dir, name));
+  }
+  const ffmpeg = firstExisting(cands);
+  if (!ffmpeg) return void 0;
+  const ffprobe = join2(dirname(ffmpeg), exe("ffprobe"));
+  return existsSync2(ffprobe) ? { ffmpeg, ffprobe } : void 0;
+}
+function adobeAppDirs(app) {
+  const re = new RegExp(`^Adobe ${app} \\d{4}$`, "i");
+  const dirs = [];
+  for (const root of adobeAppRoots()) {
+    try {
+      for (const d of readdirSync(root)) if (re.test(d)) dirs.push(join2(root, d));
+    } catch {
+    }
+  }
+  return dirs.sort().reverse();
+}
+function bundleIn(dir) {
+  return firstExisting([join2(dir, `${basename(dir)}.app`)]);
+}
+function findAfterEffects() {
+  const envDir = process.env["EDITMCP_AE_DIR"];
+  const dirs = envDir ? [envDir] : adobeAppDirs("After Effects");
   for (const dir of dirs) {
-    const sf = join(dir, "Support Files");
-    const com = join(sf, "AfterFX.com");
-    const exe = join(sf, "AfterFX.exe");
-    const aerender2 = join(sf, "aerender.exe");
-    const afterfx = firstExisting([com, exe]);
-    if (afterfx) return { afterfx, aerender: existsSync(aerender2) ? aerender2 : void 0, aeVersionDir: dir };
+    if (process.platform === "darwin") {
+      const app = bundleIn(dir);
+      const aerender3 = join2(dir, "aerender");
+      if (app) return { afterfx: app, aerender: existsSync2(aerender3) ? aerender3 : void 0, aeVersionDir: dir };
+      continue;
+    }
+    const sf = join2(dir, "Support Files");
+    const com = join2(sf, "AfterFX.com");
+    const exePath = join2(sf, "AfterFX.exe");
+    const aerender2 = join2(sf, "aerender.exe");
+    const afterfx = firstExisting([com, exePath]);
+    if (afterfx) return { afterfx, aerender: existsSync2(aerender2) ? aerender2 : void 0, aeVersionDir: dir };
   }
   return {};
 }
 function findPremiere() {
   const out2 = {};
-  try {
-    const root = "C:\\Program Files\\Adobe";
-    const dirs = readdirSync(root).sort().reverse();
-    const pr = dirs.find((d) => /^Adobe Premiere Pro \d{4}$/i.test(d));
-    const ame = dirs.find((d) => /^Adobe Media Encoder \d{4}$/i.test(d));
-    if (pr) out2.premiereExe = firstExisting([join(root, pr, "Adobe Premiere Pro.exe")]);
-    if (ame) out2.mediaEncoderExe = firstExisting([join(root, ame, "Adobe Media Encoder.exe")]);
-  } catch {
-  }
+  const find = (app) => {
+    const dir = adobeAppDirs(app)[0];
+    if (!dir) return void 0;
+    return process.platform === "darwin" ? bundleIn(dir) : firstExisting([join2(dir, `Adobe ${app}.exe`)]);
+  };
+  const pr = find("Premiere Pro");
+  const ame = find("Media Encoder");
+  if (pr) out2.premiereExe = pr;
+  if (ame) out2.mediaEncoderExe = ame;
   return out2;
 }
 function findArtCraft() {
   const pf = process.env["ProgramFiles"] ?? "C:\\Program Files";
-  const find = (envKey, app, exe) => {
+  const find = (envKey, app, cli) => {
     const envDir = process.env[envKey];
-    return firstExisting([envDir ? join(envDir, exe) : "", join(pf, app, exe)]);
+    return firstExisting([envDir ? join2(envDir, exe(cli)) : "", process.platform === "win32" ? join2(pf, app, exe(cli)) : ""]);
   };
   const out2 = {};
-  const fc = find("EDITMCP_FILMCRAFT_DIR", "FilmCraft", "filmcraft-cli.exe");
-  const ec = find("EDITMCP_EFFECTCRAFT_DIR", "EffectCraft", "effectcraft-cli.exe");
+  const fc = find("EDITMCP_FILMCRAFT_DIR", "FilmCraft", "filmcraft-cli");
+  const ec = find("EDITMCP_EFFECTCRAFT_DIR", "EffectCraft", "effectcraft-cli");
   if (fc) out2.filmcraftCli = fc;
   if (ec) out2.effectcraftCli = ec;
   return out2;
 }
 function discoverTools() {
   const ff2 = findFfmpeg();
-  if (!ff2) throw new Error("ffmpeg/ffprobe not found. Install via winget (Gyan.FFmpeg) or set EDITMCP_FFMPEG to its bin folder.");
+  if (!ff2) throw new Error(`ffmpeg/ffprobe not found. Install via ${process.platform === "darwin" ? "Homebrew (brew install ffmpeg)" : "winget (Gyan.FFmpeg)"} or set EDITMCP_FFMPEG to its bin folder.`);
   return { ...ff2, ...findAfterEffects(), ...findPremiere(), ...findArtCraft() };
 }
 async function probeEncoders(ffmpeg) {
@@ -19684,17 +19781,20 @@ async function getEnvironment() {
     tools,
     encoders,
     ffmpegVersion: version3,
-    totalRamGb: os.totalmem() / 2 ** 30,
-    freeRamGb: os.freemem() / 2 ** 30,
-    cpuThreads: os.cpus().length
+    totalRamGb: os2.totalmem() / 2 ** 30,
+    freeRamGb: freeRamBytes() / 2 ** 30,
+    cpuThreads: os2.cpus().length
   };
 }
-var WINGET_FFMPEG_GLOB;
+var WINGET_FFMPEG_GLOB, BREW_BINS, BREW_FULL;
 var init_tools = __esm({
   "src/core/tools.ts"() {
     "use strict";
     init_execa();
-    WINGET_FFMPEG_GLOB = join(os.homedir(), "AppData", "Local", "Microsoft", "WinGet", "Packages");
+    init_platform();
+    WINGET_FFMPEG_GLOB = join2(os2.homedir(), "AppData", "Local", "Microsoft", "WinGet", "Packages");
+    BREW_BINS = ["/opt/homebrew/bin", "/usr/local/bin"];
+    BREW_FULL = ["/opt/homebrew/opt/ffmpeg-full/bin", "/usr/local/opt/ffmpeg-full/bin"];
   }
 });
 
@@ -19756,10 +19856,10 @@ var init_hash = __esm({
 });
 
 // src/core/timecode.ts
-function framesToTc(frames3, fps) {
+function framesToTc(frames4, fps) {
   const f = Math.round(fps);
-  const neg = frames3 < 0;
-  let n2 = Math.abs(Math.round(frames3));
+  const neg = frames4 < 0;
+  let n2 = Math.abs(Math.round(frames4));
   const ff2 = n2 % f;
   n2 = (n2 - ff2) / f;
   const ss = n2 % 60;
@@ -19822,9 +19922,9 @@ __export(project_exports, {
   validateTimeline: () => validateTimeline
 });
 import { randomBytes } from "node:crypto";
-import { existsSync as existsSync2, mkdirSync, realpathSync } from "node:fs";
+import { existsSync as existsSync3, mkdirSync, realpathSync } from "node:fs";
 import { mkdir, readFile, rename, rm, stat as stat2, writeFile } from "node:fs/promises";
-import os2 from "node:os";
+import os3 from "node:os";
 import path6 from "node:path";
 async function createProject(dir, meta) {
   const abs = path6.resolve(dir);
@@ -19840,7 +19940,7 @@ async function createProject(dir, meta) {
     if (!(Number.isInteger(v) && v > 0)) throw new Error(`bad ${k}: ${v}`);
   }
   await mkdir(abs, { recursive: true });
-  if (existsSync2(file)) throw new Error(`project already exists: ${file}`);
+  if (existsSync3(file)) throw new Error(`project already exists: ${file}`);
   const p = {
     meta: { name, fps, width, height, createdAt: (/* @__PURE__ */ new Date()).toISOString(), schema: 1 },
     dir: abs,
@@ -19885,12 +19985,13 @@ function parseProject(raw, abs, file) {
     versions: data.versions ?? [],
     ...data.board !== void 0 ? { board: data.board } : {},
     ...data.constraints !== void 0 ? { constraints: data.constraints } : {},
-    ...data.styleRules !== void 0 ? { styleRules: data.styleRules } : {}
+    ...data.styleRules !== void 0 ? { styleRules: data.styleRules } : {},
+    ...data.captions !== void 0 ? { captions: data.captions } : {}
   };
 }
 function persistedOf(p) {
-  const { meta, assets, timeline, delivery, versions, board, constraints, styleRules } = p;
-  return JSON.parse(JSON.stringify({ meta, assets, timeline, delivery, versions, board, constraints, styleRules }));
+  const { meta, assets, timeline, delivery, versions, board, constraints, styleRules, captions } = p;
+  return JSON.parse(JSON.stringify({ meta, assets, timeline, delivery, versions, board, constraints, styleRules, captions }));
 }
 function revisionOf(raw) {
   try {
@@ -19984,19 +20085,20 @@ function protectedPaths() {
   return [...BUILTIN_PROTECTED, ...extra];
 }
 function pathKey2(p) {
-  const r = path6.resolve(p).replace(/[\\/]+$/, "");
-  return process.platform === "win32" ? r.toLowerCase() : r;
+  if (process.platform === "win32" || WIN_ABS.test(p)) return path6.win32.resolve(p).replace(/[\\/]+$/, "").toLowerCase();
+  return path6.resolve(p).replace(/\/+$/, "");
 }
 function under(target, root) {
   const t = pathKey2(target);
   const r = pathKey2(root);
-  return t === r || t.startsWith(r + path6.sep) || process.platform === "win32" && t.startsWith(r + "/");
+  const seps = r.startsWith("/") ? ["/"] : ["\\", "/"];
+  return t === r || seps.some((s) => t.startsWith(r + s));
 }
 function realish(p) {
   let cur = path6.resolve(p);
   const rest = [];
   for (; ; ) {
-    if (existsSync2(cur)) {
+    if (existsSync3(cur)) {
       try {
         return path6.join(realpathSync.native(cur), ...rest.reverse());
       } catch {
@@ -20031,7 +20133,7 @@ async function acquireLock(dir, opts) {
   const token = randomBytes(8).toString("hex");
   const staleMs = opts.staleLockMs ?? LOCK_STALE_MS;
   const deadline = Date.now() + (opts.lockTimeoutMs ?? LOCK_TIMEOUT_MS);
-  const mine = { pid: process.pid, host: os2.hostname(), at: "", token };
+  const mine = { pid: process.pid, host: os3.hostname(), at: "", token };
   for (let attempt = 0; ; attempt++) {
     try {
       await writeFile(file, JSON.stringify({ ...mine, at: (/* @__PURE__ */ new Date()).toISOString() }), { encoding: "utf8", flag: "wx" });
@@ -20048,7 +20150,7 @@ async function acquireLock(dir, opts) {
       holder = void 0;
     }
     const ageMs = holder ? Date.now() - Date.parse(holder.at) : Date.now() - ((await stat2(file).catch(() => void 0))?.mtimeMs ?? Date.now());
-    const stale = holder ? !(ageMs <= staleMs) || holder.host === os2.hostname() && !pidAlive(holder.pid) : ageMs > 5e3;
+    const stale = holder ? !(ageMs <= staleMs) || holder.host === os3.hostname() && !pidAlive(holder.pid) : ageMs > 5e3;
     if (stale) {
       if (await readFile(file, "utf8").catch(() => void 0) === raw) await rm(file, { force: true });
       continue;
@@ -20520,10 +20622,10 @@ function nextVersionId(p) {
   for (; ; ) {
     n2++;
     const id = `v${String(n2).padStart(3, "0")}`;
-    if (!p.versions.some((v) => v.id === id) && !existsSync2(path6.join(p.dir, "out", id))) return id;
+    if (!p.versions.some((v) => v.id === id) && !existsSync3(path6.join(p.dir, "out", id))) return id;
   }
 }
-var PROJECT_FILE, ProjectConflictError, ProjectLockedError, bases, isObj, same, BUILTIN_PROTECTED, LOCK_FILE, LOCK_TIMEOUT_MS, LOCK_STALE_MS, saveQueues, AUDIO_EXT, STILL_EXT, isFrames, SLOT_EPS;
+var PROJECT_FILE, ProjectConflictError, ProjectLockedError, bases, isObj, same, BUILTIN_PROTECTED, WIN_ABS, LOCK_FILE, LOCK_TIMEOUT_MS, LOCK_STALE_MS, saveQueues, AUDIO_EXT, STILL_EXT, isFrames, SLOT_EPS;
 var init_project = __esm({
   "src/core/project.ts"() {
     "use strict";
@@ -20552,6 +20654,7 @@ var init_project = __esm({
     isObj = (v) => !!v && typeof v === "object" && !Array.isArray(v);
     same = (a2, b) => hashJson(a2) === hashJson(b);
     BUILTIN_PROTECTED = ["D:\\261009_STB50Y_THAI-WORLD_CSR"];
+    WIN_ABS = /^(?:[A-Za-z]:[\\/]|\\\\)/;
     LOCK_FILE = "project.lock";
     LOCK_TIMEOUT_MS = 15e3;
     LOCK_STALE_MS = 2 * 6e4;
@@ -26185,25 +26288,1035 @@ var init_presets = __esm({
   }
 });
 
+// src/engine/aerender.ts
+import { constants as constants4, existsSync as existsSync4, mkdirSync as mkdirSync2, readdirSync as readdirSync2, statSync as statSync2 } from "node:fs";
+import { copyFile, link, statfs as fsStatfs, unlink } from "node:fs/promises";
+import os4 from "node:os";
+import { basename as basename2, dirname as dirname2, extname, join as join3, parse as parse3, resolve } from "node:path";
+import { randomBytes as randomBytes2 } from "node:crypto";
+function isStartupCrashOutput(exitCode, errors, log, userStrings = []) {
+  if (exitCode === void 0 || exitCode < 0 || exitCode >= 3221225472) return true;
+  const clean = (l) => {
+    let s = l;
+    for (const u2 of userStrings) if (u2) s = s.split(u2).join(" ");
+    return s;
+  };
+  if (log.some((l) => !l.startsWith("$ ") && STARTUP_CRASH.test(clean(l)))) return true;
+  return errors.length === 0;
+}
+async function freeDiskBytes(path12, statfs3 = (p) => fsStatfs(p)) {
+  let cur = resolve(path12);
+  while (!existsSync4(cur)) {
+    const up = dirname2(cur);
+    if (up === cur) break;
+    cur = up;
+  }
+  const s = await statfs3(cur);
+  return Number(s.bavail) * Number(s.bsize);
+}
+function defaultAeCacheDir() {
+  if (process.env["EDITMCP_AE_CACHE_DIR"]) return process.env["EDITMCP_AE_CACHE_DIR"];
+  if (process.platform === "darwin") return join3(os4.homedir(), "Library", "Caches");
+  return process.env["LOCALAPPDATA"] || os4.tmpdir();
+}
+function estimateOutputBytes(frames4, width = 1920, height = 1080, fallback = false) {
+  return frames4 * width * height * (fallback ? 4.5 : 0.45);
+}
+function driveOf(p) {
+  const root = parse3(resolve(p)).root;
+  return process.platform === "win32" ? root.toLowerCase() : root;
+}
+async function checkRenderDiskSpace(req, frames4, opts) {
+  const est = req.estimatedBytes ?? estimateOutputBytes(frames4, req.width, req.height, req.fallback);
+  const need = Math.max((opts.minFreeGb ?? 5) * GB, 2 * est);
+  const checks = [{ path: dirname2(resolve(req.outPath)), what: "output" }, { path: opts.cacheDir ?? defaultAeCacheDir(), what: "AE disk cache" }];
+  const seen = /* @__PURE__ */ new Set();
+  const notes = [];
+  for (const c3 of checks) {
+    const drive = driveOf(c3.path);
+    if (seen.has(drive)) continue;
+    seen.add(drive);
+    let free;
+    try {
+      free = await freeDiskBytes(c3.path, opts.statfs);
+    } catch (e) {
+      notes.push(`WARN disk space check skipped for ${c3.path}: ${e instanceof Error ? e.message : String(e)}`);
+      continue;
+    }
+    if (free < need) {
+      const f = (free / GB).toFixed(1), n2 = (need / GB).toFixed(1);
+      throw new DiskSpaceError(
+        `\u0E1E\u0E37\u0E49\u0E19\u0E17\u0E35\u0E48\u0E14\u0E34\u0E2A\u0E01\u0E4C\u0E44\u0E21\u0E48\u0E1E\u0E2D\u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A render: \u0E44\u0E14\u0E23\u0E1F\u0E4C ${drive} (${c3.what}) \u0E40\u0E2B\u0E25\u0E37\u0E2D ${f} GB \u0E15\u0E49\u0E2D\u0E07\u0E21\u0E35\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E19\u0E49\u0E2D\u0E22 ${n2} GB \u2014 \u0E25\u0E1A\u0E44\u0E1F\u0E25\u0E4C\u0E40\u0E01\u0E48\u0E32\u0E2B\u0E23\u0E37\u0E2D\u0E25\u0E49\u0E32\u0E07 cache \u0E02\u0E2D\u0E07 AE (ae_purge_cache) \u0E01\u0E48\u0E2D\u0E19 / not enough disk space to render: ${drive} (${c3.what}) has ${f} GB free, need ${n2} GB (max(${opts.minFreeGb ?? 5} GB, 2 \xD7 estimated output ${(est / GB).toFixed(2)} GB)); free space or purge the AE cache first`,
+        c3.path,
+        free,
+        need
+      );
+    }
+  }
+  return notes.length ? notes.join("\n") : void 0;
+}
+async function purgeIfLowCacheSpace(backend, policy = {}) {
+  if (policy.enabled === false) return { purged: false, reason: "disabled" };
+  if (!backend.purgeCaches) return { purged: false, reason: "backend cannot purge caches" };
+  const dir = policy.cacheDir ?? defaultAeCacheDir();
+  const below = policy.belowGb ?? 20;
+  let before;
+  try {
+    before = await freeDiskBytes(dir, policy.statfs) / GB;
+  } catch {
+  }
+  if (before === void 0 ? below !== Infinity : before >= below) {
+    return { purged: false, reason: before === void 0 ? "free space unknown" : `cache drive has ${before.toFixed(1)} GB free (>= ${below} GB)`, ...before !== void 0 ? { freeGbBefore: before } : {} };
+  }
+  try {
+    await backend.purgeCaches();
+  } catch (e) {
+    return { purged: false, reason: `purge failed: ${e instanceof Error ? e.message : String(e)}`, ...before !== void 0 ? { freeGbBefore: before } : {} };
+  }
+  let after;
+  try {
+    after = await freeDiskBytes(dir, policy.statfs) / GB;
+  } catch {
+  }
+  return { purged: true, reason: before === void 0 ? "forced" : `cache drive had ${before.toFixed(1)} GB free (< ${below} GB)`, ...before !== void 0 ? { freeGbBefore: before } : {}, ...after !== void 0 ? { freeGbAfter: after } : {} };
+}
+function isMissingOmTemplate(error2, userStrings = []) {
+  if (!(error2 instanceof AerenderError) || error2.reason !== "exit" && error2.reason !== "output") return false;
+  return error2.errors.some((line) => {
+    let l = line;
+    for (const s of userStrings) if (s) l = l.split(s).join(" ");
+    l = l.replace(/"[^"]*"|'[^']*'|“[^”]*”/g, " ");
+    return /output[- ]module template/i.test(l) && /\bno output[- ]module template\b|\b(?:not|never) (?:been )?found\b|could not be found|does not exist|unable to find/i.test(l);
+  });
+}
+function defaultMfrPercent(freeGb = freeRamBytes() / 2 ** 30) {
+  if (freeGb >= 16) return 90;
+  if (freeGb >= 8) return 70;
+  if (freeGb >= 4) return 50;
+  return 25;
+}
+function isAscii(s) {
+  return /^[\x00-\x7f]*$/.test(s);
+}
+function uniqueOutputPath(path12) {
+  if (!existsSync4(path12)) return path12;
+  const dir = dirname2(path12);
+  const ext = extname(path12);
+  const stem = basename2(path12, ext);
+  for (let n2 = 2; n2 < 1e4; n2++) {
+    const cand = join3(dir, `${stem}_${n2}${ext}`);
+    if (!existsSync4(cand)) return cand;
+  }
+  throw new Error(`cannot find a free output name for ${path12}`);
+}
+function asciiTempPath(outPath) {
+  const ext = extname(outPath).toLowerCase() || ".mov";
+  const dir = isAscii(dirname2(outPath)) ? dirname2(outPath) : join3(os4.tmpdir(), "editmcp-ae");
+  if (!isAscii(dir)) throw new Error("After Effects requires an ASCII TEMP directory");
+  mkdirSync2(dir, { recursive: true });
+  const safeStem = basename2(outPath, extname(outPath)).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 24) || "render";
+  const prefix = `aer_${randomBytes2(4).toString("hex")}_${safeStem}`;
+  const sequence = IMAGE_EXT.has(ext);
+  const tmp = sequence ? join3(dir, `${prefix}_[#####]${ext}`) : join3(dir, `${prefix}${ext}`);
+  return { tmp, sequence, prefix, dir };
+}
+async function moveFile(from, to) {
+  if (existsSync4(to)) throw new Error(`refusing to overwrite ${to}`);
+  mkdirSync2(dirname2(to), { recursive: true });
+  try {
+    await link(from, to);
+    await unlink(from);
+  } catch (e) {
+    if (!["EXDEV", "EPERM", "ENOTSUP"].includes(e.code ?? "")) throw e;
+    await copyFile(from, to, constants4.COPYFILE_EXCL);
+    await unlink(from);
+  }
+}
+async function killTree(pid, spawn2, child2) {
+  if (pid && process.platform === "win32") {
+    try {
+      await spawn2("taskkill", ["/T", "/F", "/PID", String(pid)], { reject: false, windowsHide: true, timeout: 1e4 });
+    } catch {
+    }
+  } else if (pid) {
+    try {
+      for (const p of ownTree(pid, await listPosixProcesses())) {
+        try {
+          process.kill(p, "SIGKILL");
+        } catch {
+        }
+      }
+    } catch {
+    }
+  }
+  try {
+    child2?.kill?.("SIGKILL");
+  } catch {
+  }
+}
+async function probeFrameCount(tools, path12, spawn2 = execa, signal) {
+  const r = await spawn2(tools.ffprobe, [
+    "-v",
+    "error",
+    "-select_streams",
+    "v:0",
+    "-count_packets",
+    "-show_entries",
+    "stream=nb_read_packets",
+    "-of",
+    "csv=p=0",
+    path12
+  ], { reject: false, windowsHide: true, timeout: 12e4, cancelSignal: signal });
+  const n2 = parseInt(String(r.stdout).trim(), 10);
+  if (r.exitCode !== 0 || !Number.isFinite(n2)) throw new Error(`ffprobe could not count frames of ${path12}: ${r.stderr}`);
+  return n2;
+}
+async function transcodeToProres(tools, src, dst, spawn2 = execa, signal) {
+  const r = await spawn2(tools.ffmpeg, [
+    "-hide_banner",
+    "-nostdin",
+    "-n",
+    "-i",
+    src,
+    "-map",
+    "0:v:0",
+    "-map",
+    "0:a:0?",
+    "-c:a",
+    "pcm_s24le",
+    "-ar",
+    "48000",
+    "-ac",
+    "2",
+    // setparams tags the frames themselves; newer ffmpeg takes stream color info from frames over -color_* flags.
+    "-vf",
+    "scale=out_color_matrix=bt709:out_range=tv,format=yuv422p10le,setparams=range=tv:color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+    "-c:v",
+    "prores_ks",
+    "-profile:v",
+    "3",
+    "-vendor",
+    "apl0",
+    "-pix_fmt",
+    "yuv422p10le",
+    "-colorspace",
+    "bt709",
+    "-color_primaries",
+    "bt709",
+    "-color_trc",
+    "bt709",
+    "-color_range",
+    "tv",
+    dst
+  ], { reject: false, windowsHide: true, timeout: 4 * 60 * 6e4, cancelSignal: signal });
+  if (r.exitCode !== 0 || !existsSync4(dst)) throw new Error(`ffmpeg ProRes transcode failed: ${r.stderr}`);
+}
+function gate(max) {
+  let g = gates.get(max);
+  if (!g) {
+    g = new Semaphore(max);
+    gates.set(max, g);
+  }
+  return g;
+}
+function createProgressParser(knownTotal) {
+  let fps;
+  let durationTc;
+  let total = knownTotal;
+  let done = 0;
+  const errors = [];
+  return {
+    get total() {
+      return total;
+    },
+    get done() {
+      return done;
+    },
+    errors,
+    feed(line) {
+      const l = line.trim();
+      if (!l) return void 0;
+      if (/aerender ERROR/i.test(l) || /^ERROR:/i.test(l)) errors.push(l);
+      let m = RE_FPS.exec(l);
+      if (m) {
+        fps = parseFloat(m[1]);
+        if (durationTc && total === void 0) total = tcToFrames(durationTc, fps);
+        return void 0;
+      }
+      m = RE_DURATION.exec(l);
+      if (m) {
+        durationTc = m[1];
+        if (fps && total === void 0) total = tcToFrames(durationTc, fps);
+        return void 0;
+      }
+      m = RE_FRAME.exec(l);
+      if (m) {
+        done = parseInt(m[2], 10);
+        return { stage: "aerender", done, total: total ?? Math.max(done, 1), message: m[1] };
+      }
+      return void 0;
+    }
+  };
+}
+function buildArgs(req, tmpOut) {
+  const offset = req.frameOffset ?? 0;
+  const args = [
+    "-project",
+    req.aep,
+    "-comp",
+    req.comp,
+    "-RStemplate",
+    req.rsTemplate,
+    "-OMtemplate",
+    req.omTemplate,
+    "-output",
+    tmpOut,
+    "-s",
+    String(offset + req.startFrame),
+    "-e",
+    String(offset + req.endFrame)
+  ];
+  if (req.mfrPercent !== void 0) args.push("-mfr", "ON", String(Math.max(1, Math.min(100, Math.round(req.mfrPercent)))));
+  args.push("-close", "DO_NOT_SAVE_CHANGES", "-sound", "OFF");
+  return args;
+}
+function findSequenceFiles(dir, prefix) {
+  try {
+    return readdirSync2(dir).filter((f) => f.startsWith(prefix) && !f.includes("[")).map((f) => join3(dir, f)).sort();
+  } catch {
+    return [];
+  }
+}
+function findRenderedFile(tmp, prefix, dir) {
+  if (existsSync4(tmp)) return tmp;
+  const cands = findSequenceFiles(dir, prefix);
+  return cands[0];
+}
+async function removeTempOutputs(dir, prefix) {
+  let names;
+  try {
+    names = readdirSync2(dir).filter((f) => f.startsWith(prefix));
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        await unlink(join3(dir, name));
+        break;
+      } catch (e) {
+        const code = e.code;
+        if (code === "ENOENT" || attempt === 4) break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    }
+  }
+}
+async function aerender(tools, req, opts = {}) {
+  const spawn2 = opts.spawn ?? execa;
+  if (!tools.aerender) throw new Error("aerender not found (ToolPaths.aerender). Install After Effects or set EDITMCP_AE_DIR.");
+  if (!existsSync4(req.aep)) throw new Error(`project not found: ${req.aep}`);
+  const { startFrame, endFrame } = req;
+  if (startFrame === void 0 || endFrame === void 0 || !Number.isInteger(startFrame) || !Number.isInteger(endFrame) || startFrame < 0) {
+    throw new Error("aerender needs an explicit non-negative integer startFrame/endFrame (0-based comp frames)");
+  }
+  if (endFrame < startFrame) throw new Error(`endFrame ${endFrame} < startFrame ${startFrame}`);
+  const maxParallel = opts.maxParallel ?? Math.max(1, parseInt(process.env["EDITMCP_AE_PARALLEL"] ?? "1", 10) || 1);
+  const release = await gate(maxParallel).acquire();
+  try {
+    req.signal?.throwIfAborted();
+    const diskNote = opts.checkDisk === false ? void 0 : await checkRenderDiskSpace(req, endFrame - startFrame + 1, opts);
+    let r;
+    try {
+      r = await renderOnce(tools, req, spawn2, startFrame, endFrame);
+    } catch (error2) {
+      if (opts.retryStartupCrash === false || !(error2 instanceof AerenderError) || !error2.startupCrash || req.signal?.aborted) throw error2;
+      const delay2 = opts.retryDelayMs ?? 3e3;
+      if (delay2 > 0) await new Promise((res) => setTimeout(res, delay2));
+      req.signal?.throwIfAborted();
+      r = await renderOnce(tools, req, spawn2, startFrame, endFrame);
+      r = { ...r, log: `retry: first attempt crashed during startup (${error2.message.split("\n")[0]})
+${r.log}` };
+    }
+    return diskNote ? { ...r, log: `${diskNote}
+${r.log}` } : r;
+  } finally {
+    release();
+  }
+}
+async function renderOnce(tools, req, spawn2, startFrame, endFrame) {
+  const t0 = Date.now();
+  const log = [];
+  const pushLog = (l) => {
+    if (log.length < MAX_LOG_LINES) log.push(l);
+  };
+  let temp;
+  try {
+    req.signal?.throwIfAborted();
+    const freeGb = freeRamBytes() / 2 ** 30;
+    const minFree = req.minFreeRamGb ?? 0.75;
+    if (freeGb < minFree) {
+      const msg = `low free RAM: ${freeGb.toFixed(2)} GB (< ${minFree} GB)`;
+      if (req.strictRam) throw new Error(msg);
+      pushLog(`WARN ${msg}`);
+    }
+    const { tmp, sequence, prefix, dir } = asciiTempPath(req.outPath);
+    temp = { dir, prefix };
+    const args = buildArgs(req, tmp);
+    pushLog(`$ aerender ${args.map((a2) => /\s/.test(a2) ? `"${a2}"` : a2).join(" ")}`);
+    const expected = endFrame - startFrame + 1;
+    const parser = createProgressParser(expected);
+    const onLine = (line) => {
+      pushLog(line);
+      const p = parser.feed(line);
+      if (p) req.onProgress?.(p);
+    };
+    const child2 = spawn2(tools.aerender, args, {
+      // checked by aerender()
+      reject: false,
+      windowsHide: true,
+      timeout: 0,
+      stripFinalNewline: false
+    });
+    let streamed = false;
+    for (const s of [child2.stdout, child2.stderr]) {
+      if (s && typeof s.on === "function") {
+        streamed = true;
+        let buf = "";
+        s.on("data", (chunk) => {
+          buf += chunk.toString();
+          let i2;
+          while ((i2 = buf.search(/\r\n|\n|\r/)) >= 0) {
+            onLine(buf.slice(0, i2));
+            buf = buf.slice(i2 + (buf[i2] === "\r" && buf[i2 + 1] === "\n" ? 2 : 1));
+          }
+        });
+        s.on("end", () => {
+          if (buf) onLine(buf);
+        });
+      }
+    }
+    let killed;
+    const timeoutMs = req.timeoutMs ?? 4 * 60 * 60 * 1e3;
+    const timer = timeoutMs > 0 ? setTimeout(() => {
+      killed = "timeout";
+      void killTree(child2.pid, spawn2, child2);
+    }, timeoutMs) : void 0;
+    const onAbort = () => {
+      killed = "abort";
+      void killTree(child2.pid, spawn2, child2);
+    };
+    req.signal?.addEventListener("abort", onAbort, { once: true });
+    let res;
+    try {
+      res = await child2;
+    } finally {
+      if (timer) clearTimeout(timer);
+      req.signal?.removeEventListener("abort", onAbort);
+    }
+    if (!streamed) {
+      for (const text2 of [res.stdout, res.stderr]) {
+        if (typeof text2 === "string") for (const line of text2.split(/\r?\n/)) onLine(line);
+      }
+    }
+    if (killed) {
+      throw new AerenderError(`aerender ${killed === "timeout" ? `timed out after ${timeoutMs} ms` : "aborted"} (process tree killed)
+${tail(log)}`, killed, parser.errors);
+    }
+    if (res.exitCode !== 0) {
+      const err2 = new AerenderError(`aerender exited with code ${res.exitCode}${parser.errors.length ? ": " + parser.errors.join(" | ") : ""}
+${tail(log)}`, "exit", parser.errors);
+      throw new AerenderError(err2.message, "exit", parser.errors, parser.done === 0 && isStartupCrashOutput(res.exitCode, parser.errors, log, [req.comp, req.aep, req.omTemplate]) && !isMissingOmTemplate(err2, [req.comp, req.aep, req.omTemplate]));
+    }
+    let produced;
+    let frames4;
+    if (sequence) {
+      const files = findSequenceFiles(dir, prefix);
+      if (files.length === 0) throw new AerenderError(`aerender produced no frames in ${dir}
+${tail(log)}`, "output", parser.errors);
+      if (files.length !== expected) throw new AerenderError(`aerender frame count mismatch: got ${files.length} images, expected ${expected} (${req.comp})
+${tail(log)}`, "frames", parser.errors);
+      if (files.length > 1) throw new AerenderError("image-sequence output supports a single frame only", "output", parser.errors);
+      produced = files[0];
+      frames4 = 1;
+    } else {
+      produced = findRenderedFile(tmp, prefix, dir);
+      if (!produced) throw new AerenderError(`aerender produced no output file (${tmp})${parser.errors.length ? ": " + parser.errors.join(" | ") : ""}
+${tail(log)}`, "output", parser.errors);
+      if (req.fallback) {
+        const prores = join3(dir, `${prefix}_prores.mov`);
+        pushLog(`fallback: transcoding ${basename2(produced)} \u2192 ProRes 422 HQ (BT.709)`);
+        await transcodeToProres(tools, produced, prores, spawn2, req.signal);
+        await unlink(produced).catch(() => void 0);
+        produced = prores;
+      }
+      frames4 = await probeFrameCount(tools, produced, spawn2, req.signal);
+      if (frames4 !== expected) {
+        throw new AerenderError(`aerender frame count mismatch: got ${frames4}, expected ${expected} (${req.comp})
+${tail(log)}`, "frames", parser.errors);
+      }
+    }
+    const finalPath = uniqueOutputPath(req.outPath);
+    if (sequence && extname(produced).toLowerCase() !== extname(finalPath).toLowerCase()) {
+      const alt = uniqueOutputPath(finalPath.slice(0, -extname(finalPath).length) + extname(produced));
+      await moveFile(produced, alt);
+      return { path: alt, frames: frames4, elapsedMs: Date.now() - t0, usedFallback: !!req.fallback, log: log.join("\n") };
+    }
+    await moveFile(produced, finalPath);
+    pushLog(`\u2192 ${finalPath} (${frames4} frames, ${statSync2(finalPath).size} bytes)`);
+    return { path: finalPath, frames: frames4, elapsedMs: Date.now() - t0, usedFallback: !!req.fallback, log: log.join("\n") };
+  } catch (error2) {
+    if (temp) await removeTempOutputs(temp.dir, temp.prefix);
+    throw error2;
+  }
+}
+function tail(log, n2 = 15) {
+  return log.slice(-n2).join("\n");
+}
+var AerenderError, STARTUP_CRASH, GB, DiskSpaceError, IMAGE_EXT, MAX_LOG_LINES, Semaphore, gates, RE_FRAME, RE_DURATION, RE_FPS;
+var init_aerender = __esm({
+  "src/engine/aerender.ts"() {
+    "use strict";
+    init_execa();
+    init_platform();
+    init_timecode();
+    AerenderError = class extends Error {
+      /** startupCrash: non-zero exit before any frame was rendered that looks like a crash, not a usage error. */
+      constructor(message, reason, errors, startupCrash = false) {
+        super(message);
+        this.reason = reason;
+        this.errors = errors;
+        this.startupCrash = startupCrash;
+        this.name = "AerenderError";
+      }
+      reason;
+      errors;
+      startupCrash;
+    };
+    STARTUP_CRASH = /crash|unexpected(?:ly)?\s+(?:quit|exit|terminat)|access violation|0xc0000005|unhandled exception|failed to (?:start|launch|initiali[sz]e)|unable to (?:start|launch|initiali[sz]e)|could not (?:start|launch|initiali[sz]e|connect)|after effects (?:has )?(?:stopped|quit|crashed)/i;
+    GB = 2 ** 30;
+    DiskSpaceError = class extends Error {
+      constructor(message, path12, freeBytes, needBytes) {
+        super(message);
+        this.path = path12;
+        this.freeBytes = freeBytes;
+        this.needBytes = needBytes;
+        this.name = "DiskSpaceError";
+      }
+      path;
+      freeBytes;
+      needBytes;
+    };
+    IMAGE_EXT = /* @__PURE__ */ new Set([".png", ".tif", ".tiff", ".jpg", ".jpeg", ".psd", ".exr", ".dpx", ".tga", ".bmp"]);
+    MAX_LOG_LINES = 4e3;
+    Semaphore = class {
+      constructor(max) {
+        this.max = max;
+      }
+      max;
+      queue = [];
+      active = 0;
+      async acquire() {
+        if (this.active < this.max) {
+          this.active++;
+          return () => this.release();
+        }
+        await new Promise((res) => this.queue.push(res));
+        return () => this.release();
+      }
+      release() {
+        const next = this.queue.shift();
+        if (next) next();
+        else this.active--;
+      }
+    };
+    gates = /* @__PURE__ */ new Map();
+    RE_FRAME = /^PROGRESS:\s+(-?\d+:\d+:\d+:\d+)\s+\((\d+)\)/;
+    RE_DURATION = /^PROGRESS:\s+Duration:\s+(\d+:\d+:\d+:\d+)/;
+    RE_FPS = /^PROGRESS:\s+Frame Rate:\s+([\d.]+)/;
+  }
+});
+
+// src/engine/transcribe.ts
+import { existsSync as existsSync5, readdirSync as readdirSync3, statSync as statSync3 } from "node:fs";
+import { mkdir as mkdir2, mkdtemp, readFile as readFile2, rename as rename2, rm as rm2, writeFile as writeFile2 } from "node:fs/promises";
+import os5 from "node:os";
+import { basename as basename3, join as join4 } from "node:path";
+function findWhisper(env = process.env) {
+  const name = exe("whisper-cli");
+  const cli = [env["EDITMCP_WHISPER_CLI"] ?? "", ...pathDirs(env).map((d) => join4(d, name)), "/opt/homebrew/bin/" + name, "/usr/local/bin/" + name].find((p) => p && existsSync5(p));
+  let model = env["EDITMCP_WHISPER_MODEL"] && existsSync5(env["EDITMCP_WHISPER_MODEL"]) ? env["EDITMCP_WHISPER_MODEL"] : void 0;
+  if (!model) {
+    const dir = modelsDir();
+    let files = [];
+    try {
+      files = readdirSync3(dir).filter((f) => /^ggml-.*\.bin$/i.test(f) && statSync3(join4(dir, f)).size > 1e6);
+    } catch {
+    }
+    const rank = (f) => {
+      const i2 = MODEL_RANK.findIndex((r) => r.test(f));
+      return i2 < 0 ? MODEL_RANK.length : i2;
+    };
+    const best = files.sort((a2, b) => rank(a2) - rank(b) || a2.localeCompare(b))[0];
+    if (best) model = join4(dir, best);
+  }
+  return { ...cli ? { cli } : {}, ...model ? { model } : {} };
+}
+function modelsDir() {
+  return join4(localAppDataDir(), "CatCut", "models");
+}
+function wordsFromWhisper(json3, lang = "auto", silences = []) {
+  const seg = wordSegmenter(json3.result?.language ?? lang);
+  const words = [];
+  for (const s of json3.transcription ?? []) {
+    const warp = speechWarp(s.offsets.from, s.offsets.to, silences);
+    const segStart = words.length;
+    const tokens = (s.tokens ?? []).filter((t) => !/^\[_.*\]$/.test(t.text.trim()) && t.text !== "");
+    let text2 = tokens.map((t) => t.text).join("");
+    const charTimes = [];
+    for (const t of tokens) for (let i2 = 0; i2 < t.text.length; i2++) charTimes.push(t.offsets);
+    if (text2.trim() !== s.text.trim() || !charTimes.length) {
+      text2 = s.text;
+      charTimes.length = 0;
+      const span = Math.max(1, s.offsets.to - s.offsets.from);
+      for (let i2 = 0; i2 < text2.length; i2++) {
+        const a2 = s.offsets.from + span * i2 / text2.length;
+        charTimes.push({ from: a2, to: a2 + span / text2.length });
+      }
+    }
+    let space = true;
+    for (const part of seg.segment(text2)) {
+      if (!part.isWordLike) {
+        if (/\s/.test(part.segment)) space = true;
+        const last = words[words.length - 1];
+        const p = part.segment.trim();
+        if (p && last && part.index > 0) last.text += p;
+        continue;
+      }
+      const first = charTimes[part.index];
+      const lastChar = charTimes[part.index + part.segment.length - 1];
+      if (!first || !lastChar) continue;
+      words.push({ text: part.segment, startMs: Math.round(first.from), endMs: Math.round(Math.max(lastChar.to, first.from)), ...space ? { space: true } : {} });
+      space = false;
+    }
+    for (let i2 = segStart; i2 < words.length; i2++) {
+      const w = words[i2];
+      w.startMs = Math.round(warp(w.startMs));
+      w.endMs = Math.round(Math.max(warp(w.endMs), w.startMs));
+    }
+  }
+  for (let i2 = 0; i2 < words.length; i2++) {
+    const w = words[i2];
+    const next = words[i2 + 1];
+    if (w.endMs <= w.startMs) w.endMs = next ? Math.max(w.startMs + 1, next.startMs) : w.startMs + 300;
+  }
+  return words;
+}
+function speechWarp(from, to, silences) {
+  const speech = [];
+  let pos = from;
+  for (const s of [...silences].sort((a2, b) => a2.startMs - b.startMs)) {
+    if (s.endMs <= pos || s.startMs >= to) continue;
+    if (s.startMs > pos) speech.push([pos, s.startMs]);
+    pos = Math.max(pos, s.endMs);
+  }
+  if (pos < to) speech.push([pos, to]);
+  const total = speech.reduce((n2, [a2, b]) => n2 + b - a2, 0);
+  const span = to - from;
+  if (!speech.length || total <= 0 || span <= 0 || total >= span - 1) return (t) => t;
+  return (t) => {
+    let left = (Math.min(Math.max(t, from), to) - from) / span * total;
+    for (const [a2, b] of speech) {
+      if (left <= b - a2) return a2 + left;
+      left -= b - a2;
+    }
+    return speech[speech.length - 1][1];
+  };
+}
+function applyFixes(words, fixes = []) {
+  let out2 = words.map((w) => ({ ...w }));
+  for (const f of fixes) {
+    if (!f.from) continue;
+    const next = [];
+    for (let i2 = 0; i2 < out2.length; i2++) {
+      let joined = "";
+      let hit = -1;
+      for (let j = i2; j < out2.length && joined.length < f.from.length + 4; j++) {
+        joined += (joined && /[A-Za-z0-9]$/.test(joined) && /^[A-Za-z0-9]/.test(out2[j].text) ? " " : "") + out2[j].text;
+        if (joined.replace(/[.,!?]+$/, "") === f.from) {
+          hit = j;
+          break;
+        }
+      }
+      if (hit < 0) {
+        next.push(out2[i2]);
+        continue;
+      }
+      const tail4 = out2[hit].text.match(/[.,!?]+$/)?.[0] ?? "";
+      next.push({ text: f.to + tail4, startMs: out2[i2].startMs, endMs: out2[hit].endMs, ...out2[i2].space ? { space: true } : {} });
+      i2 = hit;
+    }
+    out2 = next;
+  }
+  return out2;
+}
+async function transcribeFile(tools, file, opts = {}) {
+  const run6 = opts.run ?? execa;
+  const w = opts.whisper ?? findWhisper();
+  if (!w.cli) throw new Error("whisper-cli not found: brew install whisper-cpp (or ffmpeg-full), or set EDITMCP_WHISPER_CLI");
+  if (!w.model) throw new Error(`no whisper model: put a ggml-*.bin into ${modelsDir()} (e.g. ggml-large-v3-turbo-q5_0.bin) or set EDITMCP_WHISPER_MODEL`);
+  const lang = opts.lang ?? "auto";
+  const tempRoot = os5.tmpdir();
+  if (!isAscii(tempRoot)) throw new Error("whisper needs an ASCII TEMP directory; set TEMP/TMP to an ASCII path");
+  const dir = await mkdtemp(join4(tempRoot, "catcut-whisper-"));
+  try {
+    const wav = join4(dir, "audio.wav");
+    const ff2 = await run6(
+      tools.ffmpeg,
+      ["-hide_banner", "-nostdin", "-v", "error", "-y", "-i", file, "-map", "0:a:0", "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wav],
+      { reject: false, windowsHide: true, timeout: 30 * 6e4, cancelSignal: opts.signal }
+    );
+    if (ff2.exitCode !== 0) throw new Error(`ffmpeg could not read the audio of ${file}: ${String(ff2.stderr ?? "").trim().slice(-300)}`);
+    const durSec = statSync3(wav).size / 32e3;
+    const child2 = run6(
+      w.cli,
+      ["-m", w.model, "-f", wav, "-l", lang, "-ojf", "-of", join4(dir, "out"), "-np"],
+      { reject: false, windowsHide: true, timeout: 0, cancelSignal: opts.signal }
+    );
+    const timeoutMs = Math.max(10 * 6e4, durSec * 3e3);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      void killTree(child2.pid, run6, child2);
+    }, timeoutMs);
+    let r;
+    try {
+      r = await child2;
+    } finally {
+      clearTimeout(timer);
+    }
+    if (timedOut) throw new Error(`whisper timed out after ${Math.round(timeoutMs / 1e3)} s`);
+    const raw = await readFile2(join4(dir, "out.json"), "utf8").catch(() => void 0);
+    if (r.exitCode !== 0 || raw === void 0) throw new Error(`whisper-cli failed (${r.exitCode}): ${String(r.stderr ?? "").trim().slice(-400)}`);
+    const json3 = JSON.parse(raw);
+    const silences = await pauses(tools, wav, run6, opts.signal);
+    const words = wordsFromWhisper(json3, lang, silences);
+    return {
+      source: file,
+      lang: json3.result?.language ?? lang,
+      model: basename3(w.model),
+      text: (json3.transcription ?? []).map((s) => s.text.trim()).join(" "),
+      words
+    };
+  } finally {
+    await rm2(dir, { recursive: true, force: true });
+  }
+}
+async function pauses(tools, wav, run6, signal) {
+  const r = await run6(
+    tools.ffmpeg,
+    ["-hide_banner", "-nostdin", "-i", wav, "-af", "silencedetect=noise=-40dB:d=0.25", "-f", "null", "-"],
+    { reject: false, windowsHide: true, timeout: 10 * 6e4, cancelSignal: signal }
+  );
+  if (r.exitCode !== 0) return [];
+  const out2 = [];
+  let open3;
+  for (const line of String(r.stderr ?? "").split(/\r?\n/)) {
+    const a2 = /silence_start:\s*(-?[\d.]+)/.exec(line);
+    if (a2) {
+      open3 = Math.max(0, Number(a2[1]) * 1e3);
+      continue;
+    }
+    const b = /silence_end:\s*([\d.]+)/.exec(line);
+    if (b && open3 !== void 0) {
+      out2.push({ startMs: open3, endMs: Number(b[1]) * 1e3 });
+      open3 = void 0;
+    }
+  }
+  return out2;
+}
+async function transcriptKey(file, model, lang = "auto") {
+  return hashJson({ file: await hashFile(file), model: model ? basename3(model) : null, lang, timing: TIMING_VERSION }).slice(0, 16);
+}
+async function cachedTranscript(tools, cacheDir, file, opts = {}) {
+  const w = opts.whisper ?? findWhisper();
+  const target = join4(cacheDir, `${await transcriptKey(file, w.model, opts.lang)}.json`);
+  const hit = await readFile2(target, "utf8").then((t2) => JSON.parse(t2)).catch(() => void 0);
+  if (hit) return { ...hit, cached: true };
+  if (opts.cacheOnly) return void 0;
+  opts.onMiss?.();
+  const t = await transcribeFile(tools, file, { ...opts, whisper: w });
+  await mkdir2(cacheDir, { recursive: true });
+  const tmp = `${target}.${process.pid}.tmp`;
+  await writeFile2(tmp, `${JSON.stringify(t, null, 2)}
+`, "utf8");
+  await rename2(tmp, target);
+  return { ...t, cached: false };
+}
+var MODEL_RANK, wordSegmenter, TIMING_VERSION;
+var init_transcribe = __esm({
+  "src/engine/transcribe.ts"() {
+    "use strict";
+    init_execa();
+    init_hash();
+    init_platform();
+    init_aerender();
+    MODEL_RANK = [/large-v3-turbo/, /large-v3/, /large/, /medium/, /small/, /base/, /tiny/];
+    wordSegmenter = (lang) => new Intl.Segmenter(lang === "auto" ? void 0 : lang, { granularity: "word" });
+    TIMING_VERSION = 2;
+  }
+});
+
+// src/engine/captions.ts
+import { join as join5 } from "node:path";
+function captionTargets(c3, all) {
+  if (!c3) return [];
+  return c3.targets ?? all.filter((t) => !CLEAN_TARGETS.has(t));
+}
+function captionSource(p) {
+  const s = p.captions?.source ?? "auto";
+  if (s !== "auto") return s;
+  return p.timeline.audio.vo.length ? "vo" : "clips";
+}
+function captionAssets(p) {
+  const ids = captionSource(p) === "vo" ? p.timeline.audio.vo.map((c3) => c3.src) : p.timeline.video.map((c3) => c3.src);
+  return [...new Set(ids)].filter((id) => p.assets[id] && p.assets[id].kind !== "aecomp" && p.assets[id].kind !== "still");
+}
+function placeWords(p, words) {
+  const fps = p.meta.fps;
+  const best = /* @__PURE__ */ new Map();
+  const place = (list, at, srcIn, srcLen, rate2) => {
+    for (const w of list ?? []) {
+      const s = w.startMs / 1e3 * fps;
+      const e = Math.max(w.endMs / 1e3 * fps, s + 0.5);
+      const a2 = Math.max(s, srcIn);
+      const b = Math.min(e, srcIn + srcLen);
+      if (b <= a2 || b - a2 < (e - s) * 0.3) continue;
+      const start = Math.round(at + (a2 - srcIn) / rate2);
+      const end = Math.round(at + (b - srcIn) / rate2);
+      const prev = best.get(w);
+      if (!prev || b - a2 > prev.overlap) best.set(w, { overlap: b - a2, w: { text: w.text, start, end: Math.max(end, start + 1), ...w.space ? { space: true } : {} } });
+    }
+  };
+  if (captionSource(p) === "vo") {
+    for (const c3 of p.timeline.audio.vo) place(words.get(c3.src), c3.at, c3.in ?? 0, c3.dur ?? Number.MAX_SAFE_INTEGER, 1);
+  } else {
+    const starts = clipStartFrames(p);
+    for (const c3 of p.timeline.video) {
+      const rate2 = c3.speed?.rate ?? 1;
+      place(words.get(c3.src), starts.get(c3.id) ?? 0, c3.in, c3.dur * rate2, rate2);
+    }
+  }
+  return [...best.values()].map((x) => x.w).sort((a2, b) => a2.start - b.start);
+}
+function needsSpace(prev, next) {
+  return !!prev && (LATIN_END.test(prev) || LATIN_START.test(next));
+}
+function joinWords(words) {
+  let s = "";
+  for (const w of words) s += needsSpace(s, w) ? ` ${w}` : w;
+  return s;
+}
+function visibleLength(s) {
+  return s.replace(new RegExp("\\p{M}", "gu"), "").length;
+}
+function chunkWords(words, fps, o2 = {}) {
+  const maxWords = o2.maxWords ?? 3;
+  const maxChars = o2.maxChars ?? 12;
+  const pause = Math.round(fps * 0.4);
+  const out2 = [];
+  let cur = [];
+  const flush = () => {
+    if (cur.length) out2.push({ words: cur, start: cur[0].start, end: cur[cur.length - 1].end });
+    cur = [];
+  };
+  for (const w of words) {
+    const last = cur[cur.length - 1];
+    const now = visibleLength(joinWords(cur.map((x) => x.text)));
+    const len = visibleLength(joinWords([...cur.map((x) => x.text), w.text]));
+    const latin = cur.filter((x) => LATIN_START.test(x.text)).length + (LATIN_START.test(w.text) ? 1 : 0);
+    const thai = (x) => new RegExp("\\p{Script=Thai}", "u").test(x);
+    const phraseBreak = !!last && w.space && thai(last.text.slice(-1)) && thai(w.text.charAt(0)) && now >= 3;
+    const tinyThai = !w.space && new RegExp("^\\p{Script=Thai}", "u").test(w.text) && visibleLength(w.text) <= 2 && len <= maxChars + 3;
+    const tooLong = len > maxChars && !tinyThai;
+    if (last && (latin > maxWords || tooLong || phraseBreak || w.start - last.end > pause || /[.!?。]$/.test(last.text))) flush();
+    cur.push(w);
+  }
+  flush();
+  for (let i2 = out2.length - 1; i2 > 0; i2--) {
+    const a2 = out2[i2 - 1];
+    const b = out2[i2];
+    const text2 = (c3) => joinWords(c3.words.map((w) => w.text));
+    if (visibleLength(text2(b)) > 3 || b.start - a2.end > pause || /[.!?。]$/.test(a2.words[a2.words.length - 1].text)) continue;
+    if (visibleLength(text2(a2)) + visibleLength(text2(b)) <= maxChars + 4) {
+      out2.splice(i2 - 1, 2, { words: [...a2.words, ...b.words], start: a2.start, end: b.end });
+    } else if (a2.words.length >= 2) {
+      const moved = a2.words.pop();
+      b.words.unshift(moved);
+      b.start = moved.start;
+      a2.end = a2.words[a2.words.length - 1].end;
+    }
+  }
+  for (let i2 = 0; i2 < out2.length - 1; i2++) {
+    const a2 = out2[i2];
+    const b = out2[i2 + 1];
+    if (b.start - a2.end <= pause) a2.end = b.start;
+    else a2.end = Math.min(a2.end + Math.round(fps * 0.25), b.start);
+  }
+  return out2;
+}
+function defaultCaptionFont(platform2 = process.platform) {
+  if (platform2 === "darwin") return "Thonburi";
+  if (platform2 === "win32") return "Leelawadee UI";
+  return "Noto Sans Thai";
+}
+function assColor(hex2, fallback) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex2 ?? "") ?? /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(fallback);
+  return `&H00${m[3]}${m[2]}${m[1]}`.toUpperCase();
+}
+function assTime(frames4, fps) {
+  const cs = Math.max(0, Math.round(frames4 / fps * 100));
+  const h2 = Math.floor(cs / 36e4);
+  const m = Math.floor(cs % 36e4 / 6e3);
+  const s = Math.floor(cs % 6e3 / 100);
+  return `${h2}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(cs % 100).padStart(2, "0")}`;
+}
+function assText(s) {
+  return s.replace(/\\/g, "\u29F5").replace(/[{}]/g, (c3) => c3 === "{" ? "(" : ")").replace(/\r?\n/g, "\\N");
+}
+function buildAss(c3, captions, o2) {
+  const { width: W, height: H, fps } = o2;
+  const short = Math.min(W, H);
+  const vertical = H > W;
+  const scale = c3.fontScale ?? 1;
+  const font = c3.font ?? defaultCaptionFont();
+  const white2 = assColor(c3.color, "#FFFFFF");
+  const hi = assColor(c3.highlight, "#FFE135");
+  const size = Math.round(short * (vertical ? 0.078 : 0.062) * scale);
+  const outline = Math.max(2, Math.round(size * 0.09));
+  const pos = c3.position ?? (vertical ? "middle" : "bottom");
+  const align = pos === "top" ? 8 : pos === "middle" ? 5 : 2;
+  const marginV = pos === "middle" ? 0 : Math.round(H * (vertical ? 0.2 : 0.07));
+  const midShift = pos === "middle" ? Math.round(H * 0.12) : 0;
+  const marginH = Math.round(W * 0.08);
+  const styles = [
+    `Style: Caption,${font},${size},${white2},${white2},&H00000000,&H64000000,-1,0,0,0,100,100,0,0,1,${outline},0,${align},${marginH},${marginH},${marginV},1`,
+    `Style: Hook,${font},${Math.round(short * (vertical ? 0.085 : 0.07) * scale)},&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,${Math.round(short * 0.018)},0,8,${marginH},${marginH},${Math.round(H * (vertical ? 0.14 : 0.08))},1`,
+    `Style: Title,${font},${Math.round(short * 0.1 * scale)},${white2},${white2},&H00000000,&H64000000,-1,0,0,0,100,100,0,0,1,${outline + 1},0,5,${marginH},${marginH},0,1`,
+    `Style: Lower,${font},${Math.round(short * 0.045 * scale)},${white2},${white2},&H00000000,&H96000000,-1,0,0,0,100,100,0,0,3,${Math.round(short * 0.012)},0,1,${Math.round(W * 0.06)},${marginH},${Math.round(H * 0.12)},1`
+  ];
+  const ev = [];
+  const upper = (s) => c3.uppercase ? s.replace(new RegExp("\\p{Script=Latin}+", "gu"), (x) => x.toUpperCase()) : s;
+  const at = midShift ? `{\\an5\\pos(${Math.round(W / 2)},${Math.round(H / 2 + midShift)})}` : "";
+  if (c3.enabled) {
+    for (const cap of captions) {
+      const texts = cap.words.map((w) => upper(w.text));
+      if ((c3.style ?? "pop") === "clean") {
+        ev.push(`Dialogue: 0,${assTime(cap.start, fps)},${assTime(cap.end, fps)},Caption,,0,0,0,,${at}${assText(joinWords(texts))}`);
+        continue;
+      }
+      cap.words.forEach((w, i2) => {
+        const from = i2 === 0 ? cap.start : w.start;
+        const to = i2 + 1 < cap.words.length ? cap.words[i2 + 1].start : cap.end;
+        if (to <= from) return;
+        const parts = texts.map((t, j) => j === i2 ? `{\\c${hi}\\fscx112\\fscy112\\t(0,90,\\fscx100\\fscy100)}${assText(t)}{\\c${white2}}` : assText(t));
+        ev.push(`Dialogue: 0,${assTime(from, fps)},${assTime(to, fps)},Caption,,0,0,0,,${at}${joinWordsTagged(texts, parts)}`);
+      });
+    }
+  }
+  for (const t of c3.texts ?? []) ev.push(overlayEvent(t, fps, upper));
+  return [
+    "[Script Info]",
+    "ScriptType: v4.00+",
+    `PlayResX: ${W}`,
+    `PlayResY: ${H}`,
+    "WrapStyle: 0",
+    "ScaledBorderAndShadow: yes",
+    "YCbCr Matrix: TV.709",
+    "",
+    "[V4+ Styles]",
+    "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+    ...styles,
+    "",
+    "[Events]",
+    "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+    ...ev,
+    ""
+  ].join("\n");
+}
+function joinWordsTagged(plain, tagged) {
+  let s = "";
+  plain.forEach((w, i2) => {
+    s += (i2 > 0 && needsSpace(plain[i2 - 1], w) ? " " : "") + tagged[i2];
+  });
+  return s;
+}
+function overlayEvent(t, fps, upper) {
+  const style = t.style === "title" ? "Title" : t.style === "lower" ? "Lower" : "Hook";
+  const tags = style === "Lower" ? "{\\fad(150,150)}" : "{\\fad(0,120)\\fscx80\\fscy80\\t(0,120,\\fscx100\\fscy100)}";
+  return `Dialogue: 1,${assTime(t.at, fps)},${assTime(t.at + t.dur, fps)},${style},,0,0,0,,${tags}${assText(upper(t.text))}`;
+}
+async function projectWords(p, tools, cacheDir, opts = {}) {
+  const out2 = /* @__PURE__ */ new Map();
+  for (const id of captionAssets(p)) {
+    const a2 = p.assets[id];
+    if (!a2 || a2.kind === "aecomp") continue;
+    const common2 = { ...p.captions?.lang ? { lang: p.captions.lang } : {}, ...opts.signal ? { signal: opts.signal } : {} };
+    const t = opts.cacheOnly ? await cachedTranscript(tools, cacheDir, a2.path, { ...common2, cacheOnly: true }) : await cachedTranscript(tools, cacheDir, a2.path, { ...common2, onMiss: () => opts.onTranscribe?.(id) });
+    if (!t) {
+      opts.missing?.push(id);
+      continue;
+    }
+    out2.set(id, applyFixes(t.words, p.captions?.fixes));
+  }
+  return out2;
+}
+function transcriptsDir(p) {
+  return join5(p.dir, "cache", "transcripts");
+}
+function assFor(p, words, size) {
+  const c3 = p.captions;
+  if (!c3 || !c3.enabled && !c3.texts?.length) return void 0;
+  const caps = c3.enabled ? chunkWords(placeWords(p, words), p.meta.fps, { ...c3.maxWords ? { maxWords: c3.maxWords } : {}, ...c3.maxChars ? { maxChars: c3.maxChars } : {} }) : [];
+  return buildAss(c3, caps, { ...size, fps: p.meta.fps });
+}
+function subtitlesFilter(file) {
+  if (!/^[\x20-\x7e]+$/.test(file) || /['\[\];,]/.test(file)) throw new Error(`subtitle file path must be plain ASCII: ${file}`);
+  return `subtitles=filename='${file.replace(/\\/g, "/").replace(/:/g, "\\:")}'`;
+}
+var CLEAN_TARGETS, LATIN_END, LATIN_START;
+var init_captions = __esm({
+  "src/engine/captions.ts"() {
+    "use strict";
+    init_project();
+    init_transcribe();
+    CLEAN_TARGETS = /* @__PURE__ */ new Set(["th_tv", "th_prores", "m422hq"]);
+    LATIN_END = /[\p{Script=Latin}\d,.!?']$/u;
+    LATIN_START = /^[\p{Script=Latin}\d]/u;
+  }
+});
+
 // src/engine/ffmpeg.ts
 var ffmpeg_exports = {};
 __export(ffmpeg_exports, {
   Assembler: () => Assembler,
   countVideoPackets: () => countVideoPackets,
+  hasFilter: () => hasFilter,
   measureLoudnorm: () => measureLoudnorm,
   movTimescale: () => movTimescale,
   planTimeline: () => planTimeline,
   probe: () => probe
 });
-import { constants as constants4, existsSync as existsSync3 } from "node:fs";
-import { copyFile, link, mkdir as mkdir2, readFile as readFile2, rename as rename2, rm as rm2, stat as stat3, writeFile as writeFile2 } from "node:fs/promises";
+import { constants as constants5, existsSync as existsSync6 } from "node:fs";
+import { copyFile as copyFile2, link as link2, mkdir as mkdir3, mkdtemp as mkdtemp2, readFile as readFile3, rename as rename3, rm as rm3, stat as stat3, writeFile as writeFile3 } from "node:fs/promises";
 import path8 from "node:path";
-import { randomBytes as randomBytes2 } from "node:crypto";
+import { randomBytes as randomBytes3 } from "node:crypto";
+import os6 from "node:os";
 import { performance } from "node:perf_hooks";
 function throwIfAborted(signal) {
   if (signal?.aborted) throw new AbortError();
 }
-function tail(s, lines = 12) {
+function tail2(s, lines = 12) {
   const arr = s.trim().split(/\r?\n/);
   return arr.slice(-lines).join("\n");
 }
@@ -26225,17 +27338,17 @@ async function run(bin, args, o2) {
   const name = path8.basename(bin);
   if (r.timedOut) throw new Error(`${name} timed out after ${opts.timeout} ms
   args: ${args.join(" ")}`);
-  if (r.exitCode !== 0) throw new Error(`${name} failed (exit ${r.exitCode}): ${tail(stderr)}
+  if (r.exitCode !== 0) throw new Error(`${name} failed (exit ${r.exitCode}): ${tail2(stderr)}
   args: ${args.join(" ")}`);
   return { stdout, stderr };
 }
-function encodeTimeout(frames3, fps) {
-  return budgetMs(frames3 / fps);
+function encodeTimeout(frames4, fps) {
+  return budgetMs(frames4 / fps);
 }
 function budgetMs(mediaSec) {
   return Math.max(MIN_TIMEOUT_MS, Math.ceil(mediaSec * 1e3 * 30));
 }
-function movingInput(src, srcIn, frames3, fps) {
+function movingInput(src, srcIn, frames4, fps) {
   const t = src.timing;
   const pre = Math.min(srcIn, Math.round(SEEK_PREROLL_SEC * fps));
   const k0 = srcIn - pre;
@@ -26245,8 +27358,8 @@ function movingInput(src, srcIn, frames3, fps) {
   const filters = [`setpts=PTS-round(${t.videoStartExpr}/TB)`];
   if (!sameRate(src, fps)) filters.push(`fps=${fpsExpr(fps)}:start_time=${gridSec(k0, fps)}`);
   const [num3, den = "1"] = fpsExpr(fps).split("/");
-  filters.push("settb=AVTB", `trim=start=${gridSec(srcIn - 0.5, fps)}:end=${gridSec(srcIn + frames3 - 0.5, fps)}`, "setpts=PTS-STARTPTS", `settb=${den}/${num3}`);
-  return { args, filters, decodeSec: (pre + frames3) / fps + (k0 > 0 ? GOP_SLACK_SEC : 0) };
+  filters.push("settb=AVTB", `trim=start=${gridSec(srcIn - 0.5, fps)}:end=${gridSec(srcIn + frames4 - 0.5, fps)}`, "setpts=PTS-STARTPTS", `settb=${den}/${num3}`);
+  return { args, filters, decodeSec: (pre + frames4) / fps + (k0 > 0 ? GOP_SLACK_SEC : 0) };
 }
 function sameRate(src, fps) {
   return src.timing.cfr && src.probe.fps !== void 0 && Math.abs(src.probe.fps - fps) < 1e-3;
@@ -26338,12 +27451,12 @@ function clipVideo(src, clip, k0, n2, meta, idx, label, post = []) {
   const decodeSec = m.decodeSec * (mode === "motion" ? 20 : 1);
   return { args: m.args, chains: [`[${idx}:v:0]${[...m.filters, ...retime, ...look, ...post].join(",")}[${label}]`], decodeSec };
 }
-function gridSec(frames3, fps) {
+function gridSec(frames4, fps) {
   const [num3, den] = fpsExpr(fps).split("/");
-  return (frames3 * Number(den ?? 1) / Number(num3)).toFixed(9);
+  return (frames4 * Number(den ?? 1) / Number(num3)).toFixed(9);
 }
-function sec(frames3, fps) {
-  return (frames3 / fps).toFixed(6);
+function sec(frames4, fps) {
+  return (frames4 / fps).toFixed(6);
 }
 function movTimescale(fps) {
   return Number.isInteger(fps) ? fps * 1e3 : Math.round(fps) * 1e3;
@@ -26357,26 +27470,26 @@ function asciiStem(id) {
   return ascii === id ? id : `${ascii.replace(/^_+|_+$/g, "") || "x"}_${hashString(id).slice(0, 6)}`;
 }
 function uniquePath(base) {
-  if (!existsSync3(base)) return base;
+  if (!existsSync6(base)) return base;
   const ext = path8.extname(base);
   const stem = base.slice(0, base.length - ext.length);
   for (let n2 = 2; ; n2++) {
     const cand = `${stem}_${n2}${ext}`;
-    if (!existsSync3(cand)) return cand;
+    if (!existsSync6(cand)) return cand;
   }
 }
 function tmpFile(dir, ext) {
-  return path8.join(dir, `${process.pid}_${randomBytes2(4).toString("hex")}${ext}`);
+  return path8.join(dir, `${process.pid}_${randomBytes3(4).toString("hex")}${ext}`);
 }
 async function moveInto(from, to) {
-  await mkdir2(path8.dirname(to), { recursive: true });
+  await mkdir3(path8.dirname(to), { recursive: true });
   try {
-    await link(from, to);
+    await link2(from, to);
   } catch (e) {
     if (!["EXDEV", "EPERM", "ENOTSUP"].includes(e.code ?? "")) throw e;
-    await copyFile(from, to, constants4.COPYFILE_EXCL);
+    await copyFile2(from, to, constants5.COPYFILE_EXCL);
   }
-  await rm2(from);
+  await rm3(from);
 }
 function parseRate(s) {
   if (!s) return void 0;
@@ -26457,14 +27570,14 @@ async function probeInfoOf(tools, file, data, opts) {
     const fps = parseRate(v.r_frame_rate) ?? parseRate(v.avg_frame_rate);
     if (fps) info.fps = fps;
     info.allIntra = !!v.codec_name && ALL_INTRA.has(v.codec_name);
-    let frames3 = Number(v.nb_frames);
-    if (!(Number.isInteger(frames3) && frames3 > 0)) {
+    let frames4 = Number(v.nb_frames);
+    if (!(Number.isInteger(frames4) && frames4 > 0)) {
       const dur2 = Number(v.duration ?? data.format?.duration);
-      if (fps && Number.isFinite(dur2) && dur2 > 0) frames3 = Math.round(dur2 * fps);
+      if (fps && Number.isFinite(dur2) && dur2 > 0) frames4 = Math.round(dur2 * fps);
     }
-    if (!(Number.isInteger(frames3) && frames3 > 0)) frames3 = await countVideoPackets(tools, file, opts.signal);
+    if (!(Number.isInteger(frames4) && frames4 > 0)) frames4 = await countVideoPackets(tools, file, opts.signal);
     const duration3 = Number(v.duration ?? data.format?.duration);
-    info.durationFrames = Number.isFinite(duration3) && duration3 > 0 ? Math.round(duration3 * (opts.fps ?? 25)) : Math.round(frames3 * (opts.fps ?? 25) / (fps ?? opts.fps ?? 25));
+    info.durationFrames = Number.isFinite(duration3) && duration3 > 0 ? Math.round(duration3 * (opts.fps ?? 25)) : Math.round(frames4 * (opts.fps ?? 25) / (fps ?? opts.fps ?? 25));
     return info;
   }
   const dur = Number(a2?.duration ?? data.format?.duration);
@@ -26506,7 +27619,7 @@ async function measureLoudnorm(tools, file, target, signal) {
   );
   const m = /\{[^{}]*"input_i"[^{}]*\}/.exec(stderr);
   if (!m) throw new Error(`loudnorm measurement produced no JSON:
-${tail(stderr)}`);
+${tail2(stderr)}`);
   const j = JSON.parse(m[0]);
   const num3 = (k) => Number(j[k]);
   const inputI = num3("input_i");
@@ -26673,8 +27786,8 @@ function planTimeline(p, sources, encoderId = "") {
     const nNext = i2 < t.video.length - 1 ? cutAfter.get(clip.id) ?? 0 : 0;
     const trimStart = splitDissolve(nPrev).b;
     const trimEnd = splitDissolve(nNext).a;
-    const frames3 = clip.dur - trimStart - trimEnd;
-    if (frames3 <= 0) throw new Error(`clip '${clip.id}': dissolves (${trimStart}+${trimEnd}) leave no body in ${clip.dur} frames`);
+    const frames4 = clip.dur - trimStart - trimEnd;
+    if (frames4 <= 0) throw new Error(`clip '${clip.id}': dissolves (${trimStart}+${trimEnd}) leave no body in ${clip.dur} frames`);
     const key = hashJson({
       schema: 3,
       // 3: seeking input + video-start origin + ffmpeg/encoder id
@@ -26692,7 +27805,7 @@ function planTimeline(p, sources, encoderId = "") {
       ...retimeKey(clip, src),
       ...src.kind === "still" ? {} : coarseTrimKey(src, fps)
     });
-    return { clip, index: i2, src, key, srcIn: clip.in + trimStart, k0: trimStart, frames: frames3, trimStart, trimEnd };
+    return { clip, index: i2, src, key, srcIn: clip.in + trimStart, k0: trimStart, frames: frames4, trimStart, trimEnd };
   });
   const dissolves = [];
   const order = [];
@@ -26731,7 +27844,7 @@ function concatQuote(file) {
 }
 async function loadManifest(dir) {
   try {
-    const raw = await readFile2(path8.join(dir, "manifest.json"), "utf8");
+    const raw = await readFile3(path8.join(dir, "manifest.json"), "utf8");
     const m = JSON.parse(raw);
     if (m.schema === 1 && m.entries && typeof m.entries === "object") return { schema: 1, entries: m.entries };
   } catch {
@@ -26739,11 +27852,11 @@ async function loadManifest(dir) {
   return { schema: 1, entries: {} };
 }
 async function writeManifest(dir, m) {
-  await mkdir2(dir, { recursive: true });
-  const tmp = path8.join(dir, `.manifest.${process.pid}.${randomBytes2(3).toString("hex")}.tmp`);
-  await writeFile2(tmp, `${JSON.stringify(m, null, 2)}
+  await mkdir3(dir, { recursive: true });
+  const tmp = path8.join(dir, `.manifest.${process.pid}.${randomBytes3(3).toString("hex")}.tmp`);
+  await writeFile3(tmp, `${JSON.stringify(m, null, 2)}
 `, "utf8");
-  await rename2(tmp, path8.join(dir, "manifest.json"));
+  await rename3(tmp, path8.join(dir, "manifest.json"));
 }
 async function parallel(items, limit, fn) {
   let next = 0;
@@ -26764,7 +27877,16 @@ async function parallel(items, limit, fn) {
   const rejected = results.find((r) => r.status === "rejected");
   if (rejected) throw rejected.reason;
 }
-var FF_BASE, PRORES_HQ_ARGS, ALL_INTRA, MIN_TIMEOUT_MS, MAX_TIMEOUT_MS, AbortError, SEEK_PREROLL_SEC, GOP_SLACK_SEC, DISSOLVE_CURVE, MAX_RAMP_TABLE, FilterGraph, Assembler;
+async function hasFilter(ffmpeg, name) {
+  if (!filterCache.has(ffmpeg)) {
+    filterCache.set(ffmpeg, execa(ffmpeg, ["-hide_banner", "-filters"], { reject: false, windowsHide: true, timeout: 3e4 }).then((r) => new Set(String(r.stdout ?? "").split(/\r?\n/).map((l) => /^\s*[A-Z.|]{2,3}\s+(\S+)/.exec(l)?.[1]).filter((x) => !!x))));
+  }
+  return (await filterCache.get(ffmpeg)).has(name);
+}
+function isAsciiPath(s) {
+  return /^[\x20-\x7e]+$/.test(s);
+}
+var FF_BASE, PRORES_HQ_ARGS, ALL_INTRA, MIN_TIMEOUT_MS, MAX_TIMEOUT_MS, AbortError, SEEK_PREROLL_SEC, GOP_SLACK_SEC, DISSOLVE_CURVE, MAX_RAMP_TABLE, FilterGraph, Assembler, filterCache;
 var init_ffmpeg = __esm({
   "src/engine/ffmpeg.ts"() {
     "use strict";
@@ -26773,6 +27895,7 @@ var init_ffmpeg = __esm({
     init_project();
     init_timecode();
     init_presets();
+    init_captions();
     FF_BASE = ["-hide_banner", "-nostdin", "-loglevel", "error"];
     PRORES_HQ_ARGS = ["-c:v", "prores_ks", "-profile:v", "3", "-vendor", "apl0", "-pix_fmt", "yuv422p10le"];
     ALL_INTRA = /* @__PURE__ */ new Set(["prores", "dnxhd", "mjpeg", "png", "tiff", "bmp", "rawvideo", "v210", "huffyuv", "ffvhuff", "cfhd", "qtrle", "ffv1", "utvideo", "magicyuv", "dpx", "exr"]);
@@ -26893,7 +28016,7 @@ var init_ffmpeg = __esm({
         const structural = validateTimeline(withoutProbes(p));
         for (const id of usedAssetIds(p)) {
           const a2 = p.assets[id];
-          if (a2 && a2.kind !== "aecomp" && !existsSync3(a2.path)) structural.push(`asset '${id}' file missing: ${a2.path}`);
+          if (a2 && a2.kind !== "aecomp" && !existsSync6(a2.path)) structural.push(`asset '${id}' file missing: ${a2.path}`);
         }
         if (structural.length) throw new Error(`timeline invalid:
  - ${structural.join("\n - ")}`);
@@ -26960,7 +28083,7 @@ var init_ffmpeg = __esm({
             if (!entry) throw new Error(`internal: no cache entry for ${item.plan.key}`);
             lines.push(`file ${concatQuote(path8.join(paths.cacheSegments, entry.file))}`);
           }
-          await writeFile2(list, `${lines.join("\n")}
+          await writeFile3(list, `${lines.join("\n")}
 `, "utf8");
           const out2 = tmpFile(paths.tmp, ".mov");
           try {
@@ -27001,13 +28124,13 @@ var init_ffmpeg = __esm({
             if (got !== totalFrames) {
               throw new Error(`stitched master has ${got} frames, timeline is ${totalFrames} (segments: ${order.map((i2) => `${i2.kind}:${manifest.entries[i2.plan.key]?.frames}`).join(" ")})`);
             }
-            await mkdir2(versionDir, { recursive: true });
+            await mkdir3(versionDir, { recursive: true });
             await moveInto(out2, master);
             report2("mux", 1, 1, `${got} frames: ${master}`);
           } finally {
-            await rm2(list, { force: true });
-            await rm2(out2, { force: true });
-            await rm2(audio, { force: true });
+            await rm3(list, { force: true });
+            await rm3(out2, { force: true });
+            await rm3(audio, { force: true });
           }
         });
         const version3 = {
@@ -27064,7 +28187,7 @@ var init_ffmpeg = __esm({
           const fps = fingerprints.get(asset.aep)?.[asset.comp];
           if (!fps) throw new Error(`comp '${asset.comp}' not found in ${asset.aep}`);
           const pin = asset.revertPin;
-          if (pin && !force && asset.render && existsSync3(asset.render.path) && (fps === pin.compFingerprint || fps === asset.render.fingerprint)) {
+          if (pin && !force && asset.render && existsSync6(asset.render.path) && (fps === pin.compFingerprint || fps === asset.render.fingerprint)) {
             asset.fingerprint = asset.render.fingerprint;
             asset.probe = await probe(this.tools, asset.render.path, { fps: p.meta.fps, signal });
             stats.compsReused++;
@@ -27073,7 +28196,7 @@ var init_ffmpeg = __esm({
           }
           if (pin) delete asset.revertPin;
           asset.fingerprint = fps;
-          const cached2 = asset.render && asset.render.fingerprint === fps && existsSync3(asset.render.path) && asset.probe;
+          const cached2 = asset.render && asset.render.fingerprint === fps && existsSync6(asset.render.path) && asset.probe;
           if (cached2 && !force) {
             stats.compsReused++;
             report2("comps", ++done, comps.length, `${asset.id}: up to date`);
@@ -27081,7 +28204,7 @@ var init_ffmpeg = __esm({
           }
           const target = path8.join(cacheRenders, `${asciiStem(asset.id)}_${fps.slice(0, 8)}.mov`);
           let rendered;
-          if (!force && existsSync3(target)) {
+          if (!force && existsSync6(target)) {
             const info = await probe(this.tools, target, { fps: p.meta.fps, signal });
             if (info.hasVideo && info.durationFrames > 0) rendered = { path: target, frames: info.durationFrames };
           }
@@ -27110,9 +28233,9 @@ var init_ffmpeg = __esm({
           const a2 = p.assets[id];
           if (!a2) throw new Error(`timeline refers to unknown asset '${id}'`);
           if (a2.kind === "aecomp") {
-            if (needed && !needed.has(id) && (!a2.render || !a2.probe || !existsSync3(a2.render.path))) {
-              const frames3 = a2.render?.frames ?? a2.probe?.durationFrames ?? 1e9;
-              out2.set(id, { assetId: id, kind: a2.kind, path: "", probe: { durationFrames: frames3, hasVideo: true, hasAudio: false }, identity: "unrendered", timing: { fmtStartSec: 0, videoStartSec: 0, videoStartExpr: "0", audioStartSec: 0, cfr: true } });
+            if (needed && !needed.has(id) && (!a2.render || !a2.probe || !existsSync6(a2.render.path))) {
+              const frames4 = a2.render?.frames ?? a2.probe?.durationFrames ?? 1e9;
+              out2.set(id, { assetId: id, kind: a2.kind, path: "", probe: { durationFrames: frames4, hasVideo: true, hasAudio: false }, identity: "unrendered", timing: { fmtStartSec: 0, videoStartSec: 0, videoStartExpr: "0", audioStartSec: 0, cfr: true } });
               report2("probe", ++done, ids.length, `${id} (not needed)`);
               continue;
             }
@@ -27120,7 +28243,7 @@ var init_ffmpeg = __esm({
             const timing = await probeTiming(this.tools, a2.render.path, signal);
             out2.set(id, { assetId: id, kind: a2.kind, path: a2.render.path, probe: a2.probe, identity: `${a2.render.fingerprint}@${a2.render.renderedAt}`, timing });
           } else {
-            if (!existsSync3(a2.path)) throw new Error(`asset '${id}' file missing: ${a2.path}`);
+            if (!existsSync6(a2.path)) throw new Error(`asset '${id}' file missing: ${a2.path}`);
             a2.hash = await hashFile(a2.path);
             const { info, timing } = await probeDetailed(this.tools, a2.path, { fps: p.meta.fps, signal });
             a2.probe = info;
@@ -27135,9 +28258,9 @@ var init_ffmpeg = __esm({
        * A cache file is trusted when its size + mtime match what the manifest recorded when its frame
        * count was last verified; otherwise the packets are re-counted (no decode) and the record refreshed.
        */
-      async cacheHit(manifest, dir, key, frames3, kind, signal) {
+      async cacheHit(manifest, dir, key, frames4, kind, signal) {
         const entry = manifest.entries[key];
-        if (entry && entry.frames !== frames3) {
+        if (entry && entry.frames !== frames4) {
           delete manifest.entries[key];
           return false;
         }
@@ -27152,12 +28275,12 @@ var init_ffmpeg = __esm({
           throwIfAborted(signal);
           return -1;
         });
-        if (n2 !== frames3) {
+        if (n2 !== frames4) {
           if (entry) delete manifest.entries[key];
           return false;
         }
         manifest.entries[key] = {
-          ...entry ?? { file: path8.basename(file), frames: frames3, kind, mode: "encode", createdAt: (/* @__PURE__ */ new Date()).toISOString() },
+          ...entry ?? { file: path8.basename(file), frames: frames4, kind, mode: "encode", createdAt: (/* @__PURE__ */ new Date()).toISOString() },
           size: st.size,
           mtimeMs: st.mtimeMs
         };
@@ -27171,7 +28294,7 @@ var init_ffmpeg = __esm({
       async renderSegment(p, seg, paths, manifest, signal) {
         const fps = p.meta.fps;
         const final = path8.join(paths.cacheSegments, `${seg.key}.mov`);
-        await rm2(final, { force: true });
+        await rm3(final, { force: true });
         const out2 = tmpFile(paths.tmp, ".mov");
         let mode = "encode";
         if (await this.canStreamCopy(p, seg.src, seg.clip, signal)) {
@@ -27184,14 +28307,14 @@ var init_ffmpeg = __esm({
           const n2 = await countVideoPackets(this.tools, out2, signal);
           const pts = await firstVideoPtsSec(this.tools, out2, signal);
           if (n2 === seg.frames && Number.isFinite(pts) && Math.abs(pts) < 0.25 / fps) mode = "copy";
-          else await rm2(out2, { force: true });
+          else await rm3(out2, { force: true });
         }
         if (mode === "encode") {
           const enc = this.encodeArgs(p, seg.src, seg.clip, seg.k0, seg.frames, out2);
           await run(this.tools.ffmpeg, enc.args, { timeoutMs: budgetMs(enc.decodeSec), signal });
           const n2 = await countVideoPackets(this.tools, out2, signal);
           if (n2 !== seg.frames) {
-            await rm2(out2, { force: true });
+            await rm3(out2, { force: true });
             throw new Error(`segment ${seg.clip.id}: encoded ${n2} frames, expected ${seg.frames} (source ${seg.src.path} may be shorter than the clip + handles)`);
           }
         }
@@ -27210,11 +28333,11 @@ var init_ffmpeg = __esm({
         return await codecTag(this.tools, src.path, signal) === "apch";
       }
       /** ffmpeg args for a ProRes 422 HQ video-only piece of `frames` frames from clip-local timeline frame `k0`. */
-      encodeArgs(p, src, clip, k0, frames3, out2) {
+      encodeArgs(p, src, clip, k0, frames4, out2) {
         const fps = p.meta.fps;
-        const v = clipVideo(src, clip, k0, frames3, p.meta, 0, "v");
+        const v = clipVideo(src, clip, k0, frames4, p.meta, 0, "v");
         const args = [...FF_BASE, "-y", ...src.kind === "still" ? [] : ["-copyts"], ...v.args, "-filter_complex", v.chains.join(";")];
-        args.push("-map", "[v]", "-an", "-frames:v", String(frames3), ...PRORES_HQ_ARGS, "-video_track_timescale", String(movTimescale(fps)), out2);
+        args.push("-map", "[v]", "-an", "-frames:v", String(frames4), ...PRORES_HQ_ARGS, "-video_track_timescale", String(movTimescale(fps)), out2);
         return { args, decodeSec: v.decodeSec };
       }
       // ----- dissolves -----
@@ -27223,7 +28346,7 @@ var init_ffmpeg = __esm({
         const W = p.meta.width;
         const H = p.meta.height;
         const final = path8.join(paths.cacheSegments, `${d.key}.mov`);
-        await rm2(final, { force: true });
+        await rm3(final, { force: true });
         const out2 = tmpFile(paths.tmp, ".mov");
         const args = [...FF_BASE, "-y", "-copyts"];
         const chains = [];
@@ -27244,7 +28367,7 @@ var init_ffmpeg = __esm({
         await run(this.tools.ffmpeg, args, { timeoutMs: budgetMs(decodeSec), signal });
         const n2 = await countVideoPackets(this.tools, out2, signal);
         if (n2 !== d.n) {
-          await rm2(out2, { force: true });
+          await rm3(out2, { force: true });
           throw new Error(`dissolve ${d.a.clip.id}->${d.b.clip.id}: got ${n2} frames, expected ${d.n} (not enough handle in a source?)`);
         }
         await moveInto(out2, final);
@@ -27362,7 +28485,7 @@ var init_ffmpeg = __esm({
         if (!m) return raw;
         const normalized = tmpFile(tmpDir, ".wav");
         await run(this.tools.ffmpeg, [...FF_BASE, "-y", "-i", raw, "-af", loudnormPass2(m, target), "-c:a", "pcm_s24le", "-ar", "48000", "-ac", "2", normalized], { timeoutMs: 20 * 6e4, signal });
-        await rm2(raw, { force: true });
+        await rm3(raw, { force: true });
         return normalized;
       }
       /** Speech level estimate (dBFS) of one graph label: overall RMS, floored at RMS peak - 6 dB. */
@@ -27383,7 +28506,7 @@ var init_ffmpeg = __esm({
       async deliver(p, versionId, targets, opts = {}) {
         const version3 = p.versions.find((v) => v.id === versionId);
         if (!version3) throw new Error(`unknown version ${versionId}`);
-        if (!existsSync3(version3.master)) throw new Error(`master missing: ${version3.master}`);
+        if (!existsSync6(version3.master)) throw new Error(`master missing: ${version3.master}`);
         const paths = projectPaths(p);
         const fps = p.meta.fps;
         const masterLoud = resolvePreset(MASTER_PRESET_ID, p.delivery.overrides?.[MASTER_PRESET_ID]).loudness;
@@ -27394,45 +28517,72 @@ var init_ffmpeg = __esm({
         const baseName3 = `${sanitizeName2(p.meta.name, "master")}_${versionId}`;
         let done = 0;
         opts.onProgress?.({ stage: "deliver", done: 0, total: targets.length });
-        for (const target of targets) {
-          throwIfAborted(opts.signal);
-          const preset = resolvePreset(target, p.delivery.overrides?.[target]);
-          const tfps = preset.video.fps ?? fps;
-          const W = preset.video.width;
-          const H = preset.video.height;
-          const enc = presetToFfmpegArgs(preset, this.env, { width: W, height: H, fps: tfps });
-          const vf = [];
-          const sameAspect = Math.abs(W / H - mw / mh) < 0.01;
-          const scale = W === mw && H === mh ? [] : [sameAspect ? `scale=${W}:${H}:flags=lanczos` : `scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W}:${H}`];
-          if (preset.video.interlaced && Math.abs(fps - tfps * 2) < 0.01) {
-            vf.push(...scale, "tinterlace=interleave_top");
-          } else {
-            if (Math.abs(tfps - fps) > 1e-3) vf.push(`fps=${fpsExpr(tfps)}`);
-            vf.push(...scale);
-            if (preset.video.interlaced) vf.push("setfield=tff");
+        const burnTargets = new Set(captionTargets(p.captions, targets));
+        const burning = targets.some((t) => burnTargets.has(t)) && !!p.captions && (p.captions.enabled || !!p.captions.texts?.length);
+        let words = /* @__PURE__ */ new Map();
+        let subDir;
+        if (burning) {
+          if (!await hasFilter(this.tools.ffmpeg, "subtitles")) {
+            throw new Error("this ffmpeg cannot burn captions (no libass): install an ffmpeg with libass, e.g. `brew install ffmpeg-full` on macOS, or set EDITMCP_FFMPEG");
           }
-          vf.push("setsar=1");
-          const args = [...FF_BASE, "-y", "-i", version3.master, "-map", "0:v:0", "-map", "0:a:0?", "-vf", vf.join(","), ...enc.videoArgs];
-          if (preset.loudness && !sameLoudness(preset.loudness, masterLoud)) {
-            const t = { integratedLufs: preset.loudness.integratedLufs, truePeakDb: preset.loudness.truePeakDb, lra: preset.loudness.lra ?? 7 };
-            const key = hashJson({ master: version3.master, target: t });
-            if (!this.loudnessCache.has(key)) this.loudnessCache.set(key, await measureLoudnorm(this.tools, version3.master, t, opts.signal));
-            const m = this.loudnessCache.get(key);
-            if (m) args.push("-af", loudnormPass2(m, t));
+          if (p.captions.enabled) {
+            words = await projectWords(p, this.tools, transcriptsDir(p), {
+              ...opts.signal ? { signal: opts.signal } : {},
+              onTranscribe: (id) => opts.onProgress?.({ stage: "deliver", done, total: targets.length, message: `transcribing ${id} (whisper)` })
+            });
           }
-          args.push(...enc.audioArgs);
-          const versionDir = path8.join(paths.out, versionId);
-          await mkdir2(versionDir, { recursive: true });
-          const final = uniquePath(path8.join(versionDir, `${baseName3}_${preset.id}.${enc.ext}`));
-          const tmp = tmpFile(paths.tmp, `.${enc.ext}`);
-          args.push(tmp);
-          const cpu = presetToFfmpegArgs({ ...preset, video: { ...preset.video, useGpu: false } }, this.env, { width: W, height: H, fps: tfps });
-          await this.encode(args, enc.videoArgs, cpu.videoArgs, encodeTimeout(masterProbe.durationFrames, fps), opts.signal);
-          await moveInto(tmp, final);
-          out2[target] = final;
-          version3.deliverables[target] = final;
-          await saveProject(p);
-          opts.onProgress?.({ stage: "deliver", done: ++done, total: targets.length, message: `${target}: ${final}` });
+          if (!isAsciiPath(os6.tmpdir())) throw new Error("captions need an ASCII TEMP directory; set TEMP/TMP to an ASCII path");
+          subDir = await mkdtemp2(path8.join(os6.tmpdir(), "catcut-subs-"));
+        }
+        try {
+          for (const target of targets) {
+            throwIfAborted(opts.signal);
+            const preset = resolvePreset(target, p.delivery.overrides?.[target]);
+            const tfps = preset.video.fps ?? fps;
+            const W = preset.video.width;
+            const H = preset.video.height;
+            const enc = presetToFfmpegArgs(preset, this.env, { width: W, height: H, fps: tfps });
+            const vf = [];
+            const sameAspect = Math.abs(W / H - mw / mh) < 0.01;
+            const scale = W === mw && H === mh ? [] : [sameAspect ? `scale=${W}:${H}:flags=lanczos` : `scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W}:${H}`];
+            if (preset.video.interlaced && Math.abs(fps - tfps * 2) < 0.01) {
+              vf.push(...scale, "tinterlace=interleave_top");
+            } else {
+              if (Math.abs(tfps - fps) > 1e-3) vf.push(`fps=${fpsExpr(tfps)}`);
+              vf.push(...scale);
+              if (preset.video.interlaced) vf.push("setfield=tff");
+            }
+            const ass = subDir && burnTargets.has(target) ? assFor(p, words, { width: W, height: H }) : void 0;
+            if (ass) {
+              const file = path8.join(subDir, `${preset.id}.ass`);
+              await writeFile3(file, ass, "utf8");
+              vf.push(subtitlesFilter(file));
+            }
+            vf.push("setsar=1");
+            const args = [...FF_BASE, "-y", "-i", version3.master, "-map", "0:v:0", "-map", "0:a:0?", "-vf", vf.join(","), ...enc.videoArgs];
+            if (preset.loudness && !sameLoudness(preset.loudness, masterLoud)) {
+              const t = { integratedLufs: preset.loudness.integratedLufs, truePeakDb: preset.loudness.truePeakDb, lra: preset.loudness.lra ?? 7 };
+              const key = hashJson({ master: version3.master, target: t });
+              if (!this.loudnessCache.has(key)) this.loudnessCache.set(key, await measureLoudnorm(this.tools, version3.master, t, opts.signal));
+              const m = this.loudnessCache.get(key);
+              if (m) args.push("-af", loudnormPass2(m, t));
+            }
+            args.push(...enc.audioArgs);
+            const versionDir = path8.join(paths.out, versionId);
+            await mkdir3(versionDir, { recursive: true });
+            const final = uniquePath(path8.join(versionDir, `${baseName3}_${preset.id}.${enc.ext}`));
+            const tmp = tmpFile(paths.tmp, `.${enc.ext}`);
+            args.push(tmp);
+            const cpu = presetToFfmpegArgs({ ...preset, video: { ...preset.video, useGpu: false } }, this.env, { width: W, height: H, fps: tfps });
+            await this.encode(args, enc.videoArgs, cpu.videoArgs, encodeTimeout(masterProbe.durationFrames, fps), opts.signal);
+            await moveInto(tmp, final);
+            out2[target] = final;
+            version3.deliverables[target] = final;
+            await saveProject(p);
+            opts.onProgress?.({ stage: "deliver", done: ++done, total: targets.length, message: `${target}: ${final}` });
+          }
+        } finally {
+          if (subDir) await rm3(subDir, { recursive: true, force: true });
         }
         return out2;
       }
@@ -27442,19 +28592,19 @@ var init_ffmpeg = __esm({
         if (!version3) throw new Error(`unknown version ${versionId}`);
         const paths = projectPaths(p);
         const dir = path8.join(paths.review, versionId);
-        await mkdir2(dir, { recursive: true });
+        await mkdir3(dir, { recursive: true });
         const final = uniquePath(path8.join(dir, `${sanitizeName2(p.meta.name, "master")}_${versionId}_review.mp4`));
         const tmp = tmpFile(paths.tmp, ".mp4");
         const gpu = this.env.encoders.h264_nvenc;
         const vcodec = gpu ? ["-c:v", "h264_nvenc", "-preset", "p4", "-rc", "vbr", "-cq", "26", "-b:v", "0"] : ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23"];
         const fps = version3.reviewPlan?.fps ?? p.meta.fps;
-        const frames3 = version3.reviewPlan?.frames ?? timelineFrames(p);
+        const frames4 = version3.reviewPlan?.frames ?? timelineFrames(p);
         const h2 = Math.max(2, Math.floor(Math.min(540, version3.reviewPlan?.height ?? p.meta.height) / 2) * 2);
         await this.encode(
           [...FF_BASE, "-y", "-i", version3.master, "-map", "0:v:0", "-map", "0:a:0?", "-vf", `scale=-2:${h2}:flags=bicubic,setsar=1`, ...vcodec, "-pix_fmt", "yuv420p", "-g", String(Math.round(fps) * 2), "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", tmp],
           vcodec,
           ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23"],
-          encodeTimeout(frames3, fps),
+          encodeTimeout(frames4, fps),
           opts.signal
         );
         await moveInto(tmp, final);
@@ -27481,7 +28631,7 @@ var init_ffmpeg = __esm({
         if (!(Number.isInteger(from) && Number.isInteger(to) && from >= 0 && to > from)) throw new Error(`bad preview range [${from}, ${to})`);
         const n2 = to - from;
         const dir = path8.join(paths.review, "previews");
-        await mkdir2(dir, { recursive: true });
+        await mkdir3(dir, { recursive: true });
         const label = opts.version ?? "timeline";
         const final = uniquePath(path8.join(dir, `${sanitizeName2(p.meta.name, "preview")}_${label}_${from}-${to}.mp4`));
         const tmp = tmpFile(paths.tmp, ".mp4");
@@ -27512,7 +28662,7 @@ var init_ffmpeg = __esm({
         if (opts.version) {
           const v = p.versions.find((x) => x.id === opts.version);
           if (!v) throw new Error(`unknown version ${opts.version}`);
-          if (!existsSync3(v.master)) throw new Error(`master missing: ${v.master}`);
+          if (!existsSync6(v.master)) throw new Error(`master missing: ${v.master}`);
           const total = v.reviewPlan?.frames ?? await countVideoPackets(this.tools, v.master, signal);
           if (to > total) throw new Error(`preview range [${from}, ${to}) is past the end of ${v.id} (${total} frames)`);
           report2("preview", 0, 1, `${v.id} ${from}-${to}`);
@@ -27579,7 +28729,7 @@ var init_ffmpeg = __esm({
             if (!entry) throw new Error(`internal: no cache entry for ${item.plan.key}`);
             lines.push(`file ${concatQuote(path8.join(paths.cacheSegments, entry.file))}`);
           }
-          await writeFile2(list, `${lines.join("\n")}
+          await writeFile3(list, `${lines.join("\n")}
 `, "utf8");
           const off = from - (picked[0]?.start ?? 0);
           try {
@@ -27593,13 +28743,13 @@ var init_ffmpeg = __esm({
               signal
             );
           } finally {
-            await rm2(list, { force: true });
-            await rm2(audio, { force: true });
+            await rm3(list, { force: true });
+            await rm3(audio, { force: true });
           }
         }
         const got = await countVideoPackets(this.tools, tmp, signal);
         if (got !== n2) {
-          await rm2(tmp, { force: true });
+          await rm3(tmp, { force: true });
           throw new Error(`preview has ${got} frames, expected ${n2}`);
         }
         await moveInto(tmp, final);
@@ -27617,6 +28767,7 @@ var init_ffmpeg = __esm({
         };
       }
     };
+    filterCache = /* @__PURE__ */ new Map();
   }
 });
 
@@ -27626,9 +28777,9 @@ __export(qc_exports, {
   measureLoudness: () => measureLoudness,
   runQc: () => runQc
 });
-import { existsSync as existsSync4 } from "node:fs";
-import { mkdir as mkdir3 } from "node:fs/promises";
-import { basename, dirname, extname, join as join2 } from "node:path";
+import { existsSync as existsSync7 } from "node:fs";
+import { mkdir as mkdir4 } from "node:fs/promises";
+import { basename as basename4, dirname as dirname3, extname as extname2, join as join6 } from "node:path";
 async function run2(file, args, ctx) {
   const r = await execa(file, args, {
     reject: false,
@@ -27642,10 +28793,10 @@ async function run2(file, args, ctx) {
     stripFinalNewline: false
   });
   if (r.isCanceled) throw new Error("QC cancelled");
-  if (r.timedOut) throw new Error(`QC: ${basename(file)} timed out after ${ctx.timeoutMs} ms`);
+  if (r.timedOut) throw new Error(`QC: ${basename4(file)} timed out after ${ctx.timeoutMs} ms`);
   return { exitCode: r.exitCode ?? -1, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
 }
-function tail2(s, lines = 6) {
+function tail3(s, lines = 6) {
   return s.trim().split(/\r?\n/).slice(-lines).join("\n");
 }
 function parseRate2(s) {
@@ -27673,7 +28824,7 @@ async function probeStreams(tools, path12, ctx) {
     ],
     ctx
   );
-  if (r.exitCode !== 0) throw new Error(`ffprobe failed on ${path12}: ${tail2(r.stderr)}`);
+  if (r.exitCode !== 0) throw new Error(`ffprobe failed on ${path12}: ${tail3(r.stderr)}`);
   let json3;
   try {
     json3 = JSON.parse(r.stdout);
@@ -27703,7 +28854,7 @@ async function countFrames(tools, path12, p, ctx) {
     ["-v", "error", "-select_streams", "v:0", "-count_frames", "-show_entries", "stream=nb_read_frames", "-of", "json", path12],
     ctx
   );
-  if (r.exitCode !== 0) throw new Error(`ffprobe -count_frames failed on ${path12}: ${tail2(r.stderr)}`);
+  if (r.exitCode !== 0) throw new Error(`ffprobe -count_frames failed on ${path12}: ${tail3(r.stderr)}`);
   try {
     const json3 = JSON.parse(r.stdout);
     const n2 = num(json3.streams?.[0]?.["nb_read_frames"]);
@@ -27810,7 +28961,7 @@ async function analyze(tools, path12, p, ctx, dup) {
     ["-hide_banner", "-nostats", "-nostdin", "-v", "info", "-i", path12, "-filter_complex", graph.join(";"), ...maps, "-f", "null", "-"],
     ctx
   );
-  if (r.exitCode !== 0) throw new Error(`ffmpeg QC analysis failed on ${path12}: ${tail2(r.stderr)}`);
+  if (r.exitCode !== 0) throw new Error(`ffmpeg QC analysis failed on ${path12}: ${tail3(r.stderr)}`);
   const text2 = `${r.stdout}
 ${r.stderr}`;
   const out2 = {
@@ -27822,29 +28973,29 @@ ${r.stderr}`;
   if (p.hasVideo && dup) out2.kept = parseShowinfo(r.stderr);
   return out2;
 }
-function duplicateRanges(kept, frames3, fps, o2) {
-  if (!kept.length || frames3 <= 0) return [];
+function duplicateRanges(kept, frames4, fps, o2) {
+  if (!kept.length || frames4 <= 0) return [];
   const t0 = Math.min(...kept.slice(0, 4));
-  const dup = new Uint8Array(frames3).fill(1);
+  const dup = new Uint8Array(frames4).fill(1);
   for (const t of kept) {
     const f = Math.round((t - t0) * fps);
-    if (f >= 0 && f < frames3) dup[f] = 0;
+    if (f >= 0 && f < frames4) dup[f] = 0;
   }
-  for (let f = 0; f < frames3; ) {
+  for (let f = 0; f < frames4; ) {
     if (!dup[f]) {
       f++;
       continue;
     }
     let e = f;
-    while (e < frames3 && dup[e]) e++;
+    while (e < frames4 && dup[e]) e++;
     if (e - f > DUP_MAX_RUN) dup.fill(0, f, e);
     f = e;
   }
   const w = Math.max(2, Math.round((o2.minSec ?? DUP_MIN_SEC) * fps));
   const minRatio = o2.minRatio ?? DUP_MIN_RATIO;
-  const mark = new Uint8Array(frames3);
+  const mark = new Uint8Array(frames4);
   let dups = 0;
-  for (let f = 0; f < frames3; f++) {
+  for (let f = 0; f < frames4; f++) {
     dups += dup[f];
     if (f >= w) dups -= dup[f - w];
     if (f >= w - 1) {
@@ -27853,13 +29004,13 @@ function duplicateRanges(kept, frames3, fps, o2) {
     }
   }
   const out2 = [];
-  for (let f = 0; f < frames3; ) {
+  for (let f = 0; f < frames4; ) {
     if (!mark[f]) {
       f++;
       continue;
     }
     let e = f;
-    while (e < frames3 && mark[e]) e++;
+    while (e < frames4 && mark[e]) e++;
     let first = -1;
     let last = -1;
     let n2 = 0;
@@ -27890,31 +29041,32 @@ async function measureLoudness(tools, path12) {
   const b = await run2(tools.ffmpeg, [...common2, "-af", "loudnorm=I=-23:TP=-1:LRA=7:print_format=json", "-f", "null", "-"], ctx);
   const fromLoudnorm = b.exitCode === 0 ? parseLoudnormJson(b.stderr) : void 0;
   if (fromLoudnorm) return fromLoudnorm;
-  throw new Error(`loudness measurement failed on ${path12}: ${tail2(a2.exitCode === 0 ? b.stderr : a2.stderr)}`);
+  throw new Error(`loudness measurement failed on ${path12}: ${tail3(a2.exitCode === 0 ? b.stderr : a2.stderr)}`);
 }
 async function uniquePath2(p) {
-  if (!existsSync4(p)) return p;
-  const dir = dirname(p);
-  const ext = extname(p);
-  const stem = basename(p, ext);
+  if (!existsSync7(p)) return p;
+  const dir = dirname3(p);
+  const ext = extname2(p);
+  const stem = basename4(p, ext);
   for (let i2 = 2; i2 < 1e4; i2++) {
-    const cand = join2(dir, `${stem}_${i2}${ext}`);
-    if (!existsSync4(cand)) return cand;
+    const cand = join6(dir, `${stem}_${i2}${ext}`);
+    if (!existsSync7(cand)) return cand;
   }
   throw new Error(`cannot find a free name next to ${p}`);
 }
 function labelFilter(fontOpt, fps) {
   return `drawtext=${fontOpt}:fontsize=20:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=3:x=6:y=6:text='%{pts\\:hms} f%{eif\\:round(t*${fps})\\:d}'`;
 }
-async function contactSheet(tools, path12, outPath, frames3, fps, ctx) {
-  if (frames3 <= 0) return { error: "no frames to sample" };
+async function contactSheet(tools, path12, outPath, frames4, fps, ctx) {
+  if (frames4 <= 0) return { error: "no frames to sample" };
   const target = await uniquePath2(outPath);
-  await mkdir3(dirname(target), { recursive: true });
-  const step = Math.max(1, Math.ceil(frames3 / SHEET_TARGET_THUMBS));
-  const thumbs = Math.ceil(frames3 / step);
+  await mkdir4(dirname3(target), { recursive: true });
+  const step = Math.max(1, Math.ceil(frames4 / SHEET_TARGET_THUMBS));
+  const thumbs = Math.ceil(frames4 / step);
   const rows = Math.max(1, Math.ceil(thumbs / SHEET_COLUMNS));
   const fontOpts = [];
-  if (existsSync4(WINDOWS_FONT)) fontOpts.push(`fontfile='${WINDOWS_FONT.replace(":", "\\:")}'`);
+  const labelFont = labelFontOpt();
+  if (labelFont) fontOpts.push(labelFont);
   fontOpts.push("font=Sans", void 0);
   let lastErr = "";
   for (const fontOpt of fontOpts) {
@@ -27929,8 +29081,8 @@ async function contactSheet(tools, path12, outPath, frames3, fps, ctx) {
       ["-hide_banner", "-nostats", "-nostdin", "-n", "-i", path12, "-map", "0:v:0", "-vf", chain, "-frames:v", "1", "-update", "1", target],
       ctx
     );
-    if (r.exitCode === 0 && existsSync4(target)) return { path: target };
-    lastErr = tail2(r.stderr, 3);
+    if (r.exitCode === 0 && existsSync7(target)) return { path: target };
+    lastErr = tail3(r.stderr, 3);
   }
   return { error: lastErr };
 }
@@ -27975,21 +29127,21 @@ async function runQc(args) {
   if (p.fps !== void 0 && Math.abs(p.fps - fps) > 0.01) {
     issues.push({ kind: "spec", severity: "warn", message: `fps \u0E02\u0E2D\u0E07\u0E44\u0E1F\u0E25\u0E4C ${p.fps.toFixed(3)} \u2260 ${fps} \u0E17\u0E35\u0E48\u0E04\u0E32\u0E14` });
   }
-  const [frames3, analysis, sheet] = await Promise.all([
+  const [frames4, analysis, sheet] = await Promise.all([
     p.hasVideo ? countFrames(tools, path12, p, ctx) : Promise.resolve(0),
     analyze(tools, path12, p, ctx, dupOpts),
     args.contactSheetPath && p.hasVideo ? contactSheet(tools, path12, args.contactSheetPath, p.nbPackets ?? expectedFrames, fps, ctx) : Promise.resolve({})
   ]);
-  if (frames3 !== expectedFrames) {
+  if (frames4 !== expectedFrames) {
     issues.push({
       kind: "frames",
       severity: "error",
-      startFrame: Math.min(frames3, expectedFrames),
-      endFrame: Math.max(frames3, expectedFrames),
-      message: `\u0E08\u0E33\u0E19\u0E27\u0E19\u0E40\u0E1F\u0E23\u0E21 ${frames3} \u2260 ${expectedFrames} \u0E17\u0E35\u0E48\u0E27\u0E32\u0E07\u0E41\u0E1C\u0E19 (${frames3 > expectedFrames ? "\u0E40\u0E01\u0E34\u0E19" : "\u0E02\u0E32\u0E14"} ${Math.abs(frames3 - expectedFrames)} \u0E40\u0E1F\u0E23\u0E21)`
+      startFrame: Math.min(frames4, expectedFrames),
+      endFrame: Math.max(frames4, expectedFrames),
+      message: `\u0E08\u0E33\u0E19\u0E27\u0E19\u0E40\u0E1F\u0E23\u0E21 ${frames4} \u2260 ${expectedFrames} \u0E17\u0E35\u0E48\u0E27\u0E32\u0E07\u0E41\u0E1C\u0E19 (${frames4 > expectedFrames ? "\u0E40\u0E01\u0E34\u0E19" : "\u0E02\u0E32\u0E14"} ${Math.abs(frames4 - expectedFrames)} \u0E40\u0E1F\u0E23\u0E21)`
     });
   }
-  const ictx = { fps, totalFrames: frames3, clipStarts: args.clipStarts };
+  const ictx = { fps, totalFrames: frames4, clipStarts: args.clipStarts };
   for (const r of analysis.black) issues.push(rangeIssue("black", "\u0E20\u0E32\u0E1E\u0E14\u0E33 (black)", r, ictx));
   for (const r of withoutBlackFreezes(analysis.freeze, analysis.black, durationSec)) {
     issues.push(rangeIssue("freeze", "\u0E20\u0E32\u0E1E\u0E04\u0E49\u0E32\u0E07 (freeze)", r, ictx));
@@ -27997,7 +29149,7 @@ async function runQc(args) {
   for (const r of analysis.silence) issues.push(rangeIssue("silence", "\u0E40\u0E2A\u0E35\u0E22\u0E07\u0E40\u0E07\u0E35\u0E22\u0E1A (silence)", r, ictx));
   if (dupOpts && analysis.kept) {
     const minLen = Math.max(2, Math.round((dupOpts.minSec ?? DUP_MIN_SEC) * fps));
-    for (const d of duplicateRanges(analysis.kept, frames3, fps, dupOpts)) {
+    for (const d of duplicateRanges(analysis.kept, frames4, fps, dupOpts)) {
       for (const r of clampToRanges(d, dupOpts.ranges, minLen)) {
         const issue2 = rangeIssue("duplicate", `\u0E40\u0E1F\u0E23\u0E21\u0E0B\u0E49\u0E33\u0E40\u0E1B\u0E47\u0E19\u0E08\u0E31\u0E07\u0E2B\u0E27\u0E30 ~${Math.round(d.ratio * 100)}% (\u0E01\u0E23\u0E30\u0E15\u0E38\u0E01/slow-mo \u0E41\u0E1A\u0E1A\u0E0B\u0E49\u0E33\u0E40\u0E1F\u0E23\u0E21 \u2014 \u0E25\u0E2D\u0E07 interpolation blend/motion)`, { start: r.start / fps, end: r.end / fps }, ictx);
         issues.push(issue2);
@@ -28039,7 +29191,7 @@ async function runQc(args) {
   issues.sort((x, y) => x.kind === "frames" ? -1 : y.kind === "frames" ? 1 : (x.startFrame ?? -1) - (y.startFrame ?? -1));
   const report2 = {
     ok: !issues.some((i2) => i2.severity === "error"),
-    frames: frames3,
+    frames: frames4,
     expectedFrames,
     issues
   };
@@ -28051,11 +29203,12 @@ async function runQc(args) {
   if (sheet.path) report2.contactSheet = sheet.path;
   return report2;
 }
-var BLACK_MIN_SEC, BLACK_PIX_TH, FREEZE_NOISE, FREEZE_MIN_SEC, SILENCE_NOISE, SILENCE_MIN_SEC, DEFAULT_TOLERANCE_LU, DUP_MIN_RATIO, DUP_MIN_SEC, DUP_MAX_RATIO, DUP_MAX_RUN, DUP_HI, DUP_LO, DUP_FRAC, SHEET_COLUMNS, SHEET_THUMB_WIDTH, SHEET_TARGET_THUMBS, WINDOWS_FONT, VIDEO_CHAIN, AUDIO_CHAIN;
+var BLACK_MIN_SEC, BLACK_PIX_TH, FREEZE_NOISE, FREEZE_MIN_SEC, SILENCE_NOISE, SILENCE_MIN_SEC, DEFAULT_TOLERANCE_LU, DUP_MIN_RATIO, DUP_MIN_SEC, DUP_MAX_RATIO, DUP_MAX_RUN, DUP_HI, DUP_LO, DUP_FRAC, SHEET_COLUMNS, SHEET_THUMB_WIDTH, SHEET_TARGET_THUMBS, VIDEO_CHAIN, AUDIO_CHAIN;
 var init_qc = __esm({
   "src/engine/qc.ts"() {
     "use strict";
     init_execa();
+    init_platform();
     init_timecode();
     BLACK_MIN_SEC = 0.2;
     BLACK_PIX_TH = 0.1;
@@ -28074,7 +29227,6 @@ var init_qc = __esm({
     SHEET_COLUMNS = 6;
     SHEET_THUMB_WIDTH = 320;
     SHEET_TARGET_THUMBS = 36;
-    WINDOWS_FONT = "C:/Windows/Fonts/arial.ttf";
     VIDEO_CHAIN = `blackdetect=d=${BLACK_MIN_SEC}:pix_th=${BLACK_PIX_TH},freezedetect=n=${FREEZE_NOISE}:d=${FREEZE_MIN_SEC},metadata=mode=print:file=-`;
     AUDIO_CHAIN = `silencedetect=n=${SILENCE_NOISE}:d=${SILENCE_MIN_SEC},ametadata=mode=print:file=-,ebur128=peak=true:framelog=quiet`;
   }
@@ -28150,7 +29302,7 @@ var init_user_action = __esm({
         title: "\u0E2D\u0E19\u0E38\u0E0D\u0E32\u0E15\u0E43\u0E2B\u0E49\u0E2A\u0E04\u0E23\u0E34\u0E1B\u0E15\u0E4C\u0E40\u0E02\u0E35\u0E22\u0E19\u0E44\u0E1F\u0E25\u0E4C\u0E43\u0E19 After Effects",
         steps: [
           "\u0E40\u0E1B\u0E34\u0E14 After Effects",
-          "Edit > Preferences > Scripting & Expressions",
+          process.platform === "darwin" ? "After Effects > Settings > Scripting & Expressions" : "Edit > Preferences > Scripting & Expressions",
           '\u0E15\u0E34\u0E4A\u0E01 "Allow Scripts to Write Files and Access Network" \u0E41\u0E25\u0E49\u0E27\u0E01\u0E14 OK',
           "\u0E1B\u0E34\u0E14 After Effects (\u0E44\u0E21\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E2A\u0E23\u0E49\u0E32\u0E07\u0E2B\u0E23\u0E37\u0E2D Save \u0E42\u0E1B\u0E23\u0E40\u0E08\u0E01\u0E15\u0E4C)"
         ],
@@ -28160,11 +29312,40 @@ var init_user_action = __esm({
         closeAfter: "\u0E17\u0E31\u0E19\u0E17\u0E35\u0E17\u0E35\u0E48\u0E01\u0E14 OK",
         needsProject: false
       }),
+      aeCloseMac: () => ({
+        code: "ae-close-mac",
+        app: "after-effects",
+        title: "\u0E1B\u0E34\u0E14 After Effects \u0E01\u0E48\u0E2D\u0E19",
+        steps: ["Save \u0E07\u0E32\u0E19\u0E43\u0E19 After Effects \u0E16\u0E49\u0E32\u0E21\u0E35", "\u0E1B\u0E34\u0E14 After Effects (Cmd+Q)", '\u0E1A\u0E2D\u0E01 AI \u0E27\u0E48\u0E32 "\u0E1B\u0E34\u0E14 AE \u0E41\u0E25\u0E49\u0E27" \u0E41\u0E25\u0E49\u0E27 CatCut \u0E08\u0E30\u0E25\u0E2D\u0E07\u0E43\u0E2B\u0E21\u0E48\u0E40\u0E2D\u0E07'],
+        why: "\u0E1A\u0E19 Mac \u0E40\u0E1B\u0E34\u0E14 AE \u0E44\u0E14\u0E49\u0E17\u0E35\u0E25\u0E30\u0E15\u0E31\u0E27 CatCut \u0E08\u0E36\u0E07\u0E15\u0E49\u0E2D\u0E07\u0E40\u0E1B\u0E34\u0E14 AE \u0E02\u0E2D\u0E07\u0E15\u0E31\u0E27\u0E40\u0E2D\u0E07\u0E41\u0E25\u0E49\u0E27\u0E1B\u0E34\u0E14\u0E40\u0E21\u0E37\u0E48\u0E2D\u0E40\u0E2A\u0E23\u0E47\u0E08 \u0E16\u0E49\u0E32\u0E43\u0E0A\u0E49\u0E15\u0E31\u0E27\u0E17\u0E35\u0E48\u0E04\u0E38\u0E13\u0E40\u0E1B\u0E34\u0E14\u0E2D\u0E22\u0E39\u0E48 \u0E07\u0E32\u0E19\u0E02\u0E2D\u0E07\u0E04\u0E38\u0E13\u0E2D\u0E32\u0E08\u0E16\u0E39\u0E01\u0E1B\u0E34\u0E14\u0E44\u0E1B\u0E14\u0E49\u0E27\u0E22",
+        frequency: "each-time",
+        keepOpen: false,
+        closeAfter: "CatCut \u0E1B\u0E34\u0E14 AE \u0E43\u0E2B\u0E49\u0E40\u0E2D\u0E07\u0E40\u0E21\u0E37\u0E48\u0E2D\u0E07\u0E32\u0E19\u0E40\u0E2A\u0E23\u0E47\u0E08",
+        needsProject: false
+      }),
+      macAutomation: () => ({
+        code: "mac-automation",
+        app: "after-effects",
+        title: "\u0E2D\u0E19\u0E38\u0E0D\u0E32\u0E15\u0E43\u0E2B\u0E49\u0E2A\u0E31\u0E48\u0E07\u0E07\u0E32\u0E19 After Effects (macOS)",
+        steps: [
+          "\u0E40\u0E1B\u0E34\u0E14 System Settings > Privacy & Security > Automation",
+          '\u0E2B\u0E32\u0E41\u0E2D\u0E1B\u0E17\u0E35\u0E48\u0E23\u0E31\u0E19 CatCut (Claude, Terminal \u0E2B\u0E23\u0E37\u0E2D Codex) \u0E41\u0E25\u0E49\u0E27\u0E40\u0E1B\u0E34\u0E14\u0E2A\u0E27\u0E34\u0E15\u0E0A\u0E4C "Adobe After Effects"',
+          '\u0E1A\u0E2D\u0E01 AI \u0E27\u0E48\u0E32 "\u0E2D\u0E19\u0E38\u0E0D\u0E32\u0E15\u0E41\u0E25\u0E49\u0E27" \u0E41\u0E25\u0E49\u0E27 CatCut \u0E08\u0E30\u0E25\u0E2D\u0E07\u0E43\u0E2B\u0E21\u0E48\u0E40\u0E2D\u0E07'
+        ],
+        why: "\u0E1A\u0E19 Mac CatCut \u0E2A\u0E31\u0E48\u0E07 AE \u0E1C\u0E48\u0E32\u0E19 AppleScript \u0E0B\u0E36\u0E48\u0E07 macOS \u0E15\u0E49\u0E2D\u0E07\u0E43\u0E2B\u0E49\u0E04\u0E38\u0E13\u0E2D\u0E19\u0E38\u0E0D\u0E32\u0E15\u0E01\u0E48\u0E2D\u0E19",
+        frequency: "once",
+        keepOpen: false,
+        closeAfter: "\u0E44\u0E21\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E40\u0E1B\u0E34\u0E14 AE",
+        needsProject: false
+      }),
       ffmpegMissing: (o2 = {}) => ({
         code: "ffmpeg-missing",
         app: "ffmpeg",
         title: "\u0E44\u0E21\u0E48\u0E1E\u0E1A ffmpeg",
-        steps: ["\u0E15\u0E34\u0E14\u0E15\u0E31\u0E49\u0E07\u0E43\u0E2B\u0E21\u0E48\u0E14\u0E49\u0E27\u0E22 install.cmd \u0E02\u0E2D\u0E07 CatCut (\u0E21\u0E35 ffmpeg \u0E21\u0E32\u0E14\u0E49\u0E27\u0E22)", "\u0E2B\u0E23\u0E37\u0E2D\u0E15\u0E31\u0E49\u0E07 EDITMCP_FFMPEG / EDITMCP_FFPROBE \u0E43\u0E2B\u0E49\u0E0A\u0E35\u0E49\u0E44\u0E1B\u0E17\u0E35\u0E48\u0E44\u0E1F\u0E25\u0E4C"],
+        steps: [
+          process.platform === "darwin" ? "\u0E15\u0E34\u0E14\u0E15\u0E31\u0E49\u0E07\u0E14\u0E49\u0E27\u0E22 Homebrew: `brew install ffmpeg` (\u0E2B\u0E23\u0E37\u0E2D\u0E23\u0E31\u0E19 install.sh \u0E02\u0E2D\u0E07 CatCut)" : "\u0E15\u0E34\u0E14\u0E15\u0E31\u0E49\u0E07\u0E43\u0E2B\u0E21\u0E48\u0E14\u0E49\u0E27\u0E22 install.cmd \u0E02\u0E2D\u0E07 CatCut (\u0E21\u0E35 ffmpeg \u0E21\u0E32\u0E14\u0E49\u0E27\u0E22)",
+          "\u0E2B\u0E23\u0E37\u0E2D\u0E15\u0E31\u0E49\u0E07 EDITMCP_FFMPEG \u0E43\u0E2B\u0E49\u0E0A\u0E35\u0E49\u0E44\u0E1B\u0E17\u0E35\u0E48\u0E42\u0E1F\u0E25\u0E40\u0E14\u0E2D\u0E23\u0E4C\u0E02\u0E2D\u0E07 ffmpeg"
+        ],
         why: `\u0E17\u0E38\u0E01\u0E01\u0E32\u0E23\u0E15\u0E31\u0E14\u0E15\u0E48\u0E2D \u0E1B\u0E23\u0E30\u0E01\u0E2D\u0E1A\u0E44\u0E1F\u0E25\u0E4C \u0E41\u0E25\u0E30\u0E2A\u0E48\u0E07\u0E2D\u0E2D\u0E01\u0E43\u0E0A\u0E49 ffmpeg${o2["detail"] ? ` (${o2["detail"]})` : ""}`,
         frequency: "once",
         keepOpen: false,
@@ -28291,13 +29472,14 @@ var init_user_action = __esm({
 });
 
 // src/engine/housekeeping.ts
-import { randomBytes as randomBytes3 } from "node:crypto";
-import { existsSync as existsSync5, realpathSync as realpathSync2 } from "node:fs";
-import { lstat, mkdir as mkdir4, opendir, readdir, readFile as readFile3, rename as rename3, rmdir, statfs as fsStatfs, unlink, writeFile as writeFile3 } from "node:fs/promises";
+import { randomBytes as randomBytes4 } from "node:crypto";
+import { existsSync as existsSync8, realpathSync as realpathSync2 } from "node:fs";
+import { lstat, mkdir as mkdir5, opendir, readdir, readFile as readFile4, rename as rename4, rmdir, statfs as fsStatfs2, unlink as unlink2, writeFile as writeFile4 } from "node:fs/promises";
 import path9 from "node:path";
 async function freeSpace(target, statfs3) {
-  let p = path9.resolve(target);
-  while (!existsSync5(p)) {
+  const foreign = process.platform !== "win32" && WIN_ABS2.test(target);
+  let p = foreign ? target : path9.resolve(target);
+  while (!foreign && !existsSync8(p)) {
     const up = path9.dirname(p);
     if (up === p) break;
     p = up;
@@ -28307,7 +29489,9 @@ async function freeSpace(target, statfs3) {
   return { free: Number(s.bavail) * bsize, total: Number(s.blocks) * bsize };
 }
 function driveRoot(p) {
-  return path9.parse(path9.resolve(p)).root.toUpperCase();
+  if (WIN_ABS2.test(p) || process.platform === "win32") return path9.win32.parse(path9.win32.resolve(p)).root.toUpperCase();
+  const abs = path9.resolve(p);
+  return /^\/Volumes\/[^/]+/.exec(abs)?.[0].concat("/") ?? path9.parse(abs).root;
 }
 function parseAePrefs(text2) {
   const out2 = /* @__PURE__ */ new Map();
@@ -28335,8 +29519,9 @@ function versionKey(v) {
 }
 async function aePrefsDirs(env) {
   const appdata = env["APPDATA"];
-  if (!appdata) return [];
-  const root = path9.join(appdata, "Adobe", "After Effects");
+  const adobe = appdata ? path9.join(appdata, "Adobe") : process.platform === "darwin" && env["HOME"] ? adobePrefsDir(env, "darwin", env["HOME"]) : void 0;
+  if (!adobe) return [];
+  const root = path9.join(adobe, "After Effects");
   const versions = (await readdir(root).catch(() => [])).filter((v) => /^\d+(\.\d+)*$/.test(v)).sort((a2, b) => {
     const x = versionKey(a2);
     const y = versionKey(b);
@@ -28358,7 +29543,7 @@ async function aeScriptingPref(env = process.env) {
     const main2 = files.find((f) => /^Adobe After Effects [\d.]+ Prefs\.txt$/i.test(f));
     if (!main2) continue;
     const file = path9.join(dir, main2);
-    const m = /"Pref_SCRIPTING_FILE_NETWORK_SECURITY"\s*=\s*"?([0-9A-Fa-f]+)"?/.exec(await readFile3(file, "utf8").catch(() => ""));
+    const m = /"Pref_SCRIPTING_FILE_NETWORK_SECURITY"\s*=\s*"?([0-9A-Fa-f]+)"?/.exec(await readFile4(file, "utf8").catch(() => ""));
     return m ? { allowed: parseInt(m[1], 16) === 1, prefsFile: file, aeVersion: ver } : { prefsFile: file, aeVersion: ver };
   }
   return {};
@@ -28367,7 +29552,7 @@ async function findAeDiskCache(env = process.env) {
   for (const { ver, dir, files } of await aePrefsDirs(env)) {
     for (const f of files) {
       const file = path9.join(dir, f);
-      const prefs = parseAePrefs(await readFile3(file, "utf8").catch(() => ""));
+      const prefs = parseAePrefs(await readFile4(file, "utf8").catch(() => ""));
       let folder;
       let maxSizeGb;
       const dc = prefs.get("Disk Cache Controls");
@@ -28386,7 +29571,9 @@ async function findAeDiskCache(env = process.env) {
     }
   }
   const local = env["LOCALAPPDATA"];
-  if (local && existsSync5(path9.join(local, "Temp"))) return { folder: path9.join(local, "Temp"), source: "default" };
+  if (local && existsSync8(path9.join(local, "Temp"))) return { folder: path9.join(local, "Temp"), source: "default" };
+  const caches = env["HOME"] ? path9.join(env["HOME"], "Library", "Caches") : void 0;
+  if (!local && caches && process.platform === "darwin" && existsSync8(caches)) return { folder: caches, source: "default" };
   return { source: "unknown" };
 }
 async function aeCacheDirs(folder) {
@@ -28444,7 +29631,7 @@ async function aeDiskCache(env = process.env) {
   return aeCache;
 }
 async function diskReport(p, opts = {}) {
-  const statfs3 = opts.statfs ?? fsStatfs;
+  const statfs3 = opts.statfs ?? fsStatfs2;
   const warnings = [];
   const aeCache = await aeDiskCache(opts.env ?? process.env);
   const found = aeCache;
@@ -28494,7 +29681,7 @@ async function diskReport(p, opts = {}) {
     other[e.name] = e.isDirectory() ? await sizeOf(full) : (await lstat(full).catch(() => void 0))?.size ?? 0;
   }
   const total = cache.total + outTotal + review + Object.values(other).reduce((a2, b) => a2 + b, 0);
-  const budget = (opts.budgetGb ?? DEFAULT_BUDGET_GB) * GB;
+  const budget = (opts.budgetGb ?? DEFAULT_BUDGET_GB) * GB2;
   if (total > budget) {
     const top = Object.entries({ cache: cache.total, out: outTotal, review, ...other }).sort((a2, b) => b[1] - a2[1]).slice(0, 3).map(([k, v]) => `${k} ${fmtGb(v)}`).join(", ");
     warnings.push(`\u0E42\u0E1B\u0E23\u0E40\u0E08\u0E01\u0E15\u0E4C\u0E43\u0E0A\u0E49\u0E1E\u0E37\u0E49\u0E19\u0E17\u0E35\u0E48 ${fmtGb(total)} \u0E40\u0E01\u0E34\u0E19\u0E07\u0E1A ${fmtGb(budget)} (\u0E21\u0E32\u0E01\u0E2A\u0E38\u0E14: ${top}) \u2014 \u0E14\u0E39 cache_gc_plan / project uses ${fmtGb(total)}, over the ${fmtGb(budget)} budget`);
@@ -28508,10 +29695,10 @@ async function diskReport(p, opts = {}) {
   };
 }
 function fmtGb(b) {
-  return `${(b / GB).toFixed(1)} GB`;
+  return `${(b / GB2).toFixed(1)} GB`;
 }
 async function preflight(p, estimatedBytes, opts = {}) {
-  const statfs3 = opts.statfs ?? fsStatfs;
+  const statfs3 = opts.statfs ?? fsStatfs2;
   const issues = [];
   const targets = [{ path: p.dir, est: Math.max(0, estimatedBytes || 0), label: "project" }];
   const seen = /* @__PURE__ */ new Set([driveRoot(p.dir)]);
@@ -28599,7 +29786,7 @@ async function gcPlan(p, opts = {}) {
   const segDir = path9.join(p.dir, "cache", "segments");
   let manifest = {};
   try {
-    const m = JSON.parse(await readFile3(path9.join(segDir, "manifest.json"), "utf8"));
+    const m = JSON.parse(await readFile4(path9.join(segDir, "manifest.json"), "utf8"));
     manifest = m.entries ?? {};
   } catch {
   }
@@ -28641,7 +29828,7 @@ async function gcPlan(p, opts = {}) {
   }
   for (const f of await filesUnder(path9.join(p.dir, "cache", "tmp"))) if (old(f.mtimeMs)) push(f, "stale-temp");
   const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\..*$/, "");
-  const planId = `${stamp}-${randomBytes3(3).toString("hex")}`;
+  const planId = `${stamp}-${randomBytes4(3).toString("hex")}`;
   const body2 = {
     schema: 1,
     planId,
@@ -28654,8 +29841,8 @@ async function gcPlan(p, opts = {}) {
     keptUnknown
   };
   const plan = { ...body2, hash: hashJson(body2) };
-  await mkdir4(planDir(p), { recursive: true });
-  await writeFile3(path9.join(planDir(p), `plan-${planId}.json`), `${JSON.stringify(plan, null, 2)}
+  await mkdir5(planDir(p), { recursive: true });
+  await writeFile4(path9.join(planDir(p), `plan-${planId}.json`), `${JSON.stringify(plan, null, 2)}
 `, { encoding: "utf8", flag: "wx" });
   return plan;
 }
@@ -28678,7 +29865,7 @@ async function gcApply(p, planId, confirm, opts = {}) {
   const file = path9.join(planDir(p), `plan-${planId}.json`);
   let plan;
   try {
-    plan = JSON.parse(await readFile3(file, "utf8"));
+    plan = JSON.parse(await readFile4(file, "utf8"));
   } catch {
     throw new Error(`\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E41\u0E1C\u0E19 ${planId} (\u0E2B\u0E23\u0E37\u0E2D\u0E43\u0E0A\u0E49\u0E44\u0E1B\u0E41\u0E25\u0E49\u0E27) \u2014 \u0E40\u0E23\u0E35\u0E22\u0E01 cache_gc_plan \u0E43\u0E2B\u0E21\u0E48 / plan not found or already applied`);
   }
@@ -28716,7 +29903,7 @@ async function gcApply(p, planId, confirm, opts = {}) {
       continue;
     }
     try {
-      await unlink(real);
+      await unlink2(real);
       deleted.push({ path: it.path, bytes: it.bytes });
       dirs.add(path9.dirname(real));
     } catch (e) {
@@ -28739,569 +29926,35 @@ async function gcApply(p, planId, confirm, opts = {}) {
     }
   }
   const histDir = path9.join(p.dir, "history");
-  await mkdir4(histDir, { recursive: true });
+  await mkdir5(histDir, { recursive: true });
   const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\..*$/, "");
   let log = path9.join(histDir, `gc-${stamp}.log`);
-  for (let i2 = 2; existsSync5(log); i2++) log = path9.join(histDir, `gc-${stamp}_${i2}.log`);
+  for (let i2 = 2; existsSync8(log); i2++) log = path9.join(histDir, `gc-${stamp}_${i2}.log`);
   const lines = [
     `# gc plan ${planId} applied ${now.toISOString()} (confirm: ${confirm})`,
     ...deleted.map((d) => `DELETED	${d.bytes}	${d.path}`),
     ...skipped.map((s) => `SKIPPED	${s.reason}	${s.path}`)
   ];
-  await writeFile3(log, `${lines.join("\n")}
+  await writeFile4(log, `${lines.join("\n")}
 `, { encoding: "utf8", flag: "wx" });
-  await rename3(file, path9.join(planDir(p), `plan-${planId}.applied.json`));
+  await rename4(file, path9.join(planDir(p), `plan-${planId}.applied.json`));
   return { planId, deleted, skipped, freedBytes: deleted.reduce((s, d) => s + d.bytes, 0), purgedVersions, log };
 }
-var GB, DISK_ERROR_BYTES, DISK_WARN_BYTES, PLAN_MAX_AGE_MS, MIN_AGE_MS, CONFIRM_TOKENS, DEFAULT_BUDGET_GB;
+var GB2, DISK_ERROR_BYTES, DISK_WARN_BYTES, PLAN_MAX_AGE_MS, MIN_AGE_MS, CONFIRM_TOKENS, DEFAULT_BUDGET_GB, WIN_ABS2;
 var init_housekeeping = __esm({
   "src/engine/housekeeping.ts"() {
     "use strict";
     init_hash();
+    init_platform();
     init_project();
-    GB = 1024 ** 3;
-    DISK_ERROR_BYTES = 5 * GB;
-    DISK_WARN_BYTES = 20 * GB;
+    GB2 = 1024 ** 3;
+    DISK_ERROR_BYTES = 5 * GB2;
+    DISK_WARN_BYTES = 20 * GB2;
     PLAN_MAX_AGE_MS = 10 * 6e4;
     MIN_AGE_MS = 60 * 6e4;
     CONFIRM_TOKENS = /* @__PURE__ */ new Set(["\u0E25\u0E1A", "delete"]);
     DEFAULT_BUDGET_GB = 50;
-  }
-});
-
-// src/engine/aerender.ts
-import { constants as constants5, existsSync as existsSync6, mkdirSync as mkdirSync2, readdirSync as readdirSync2, statSync as statSync2 } from "node:fs";
-import { copyFile as copyFile2, link as link2, statfs as fsStatfs2, unlink as unlink2 } from "node:fs/promises";
-import os3 from "node:os";
-import { basename as basename2, dirname as dirname2, extname as extname2, join as join3, parse as parse3, resolve } from "node:path";
-import { randomBytes as randomBytes4 } from "node:crypto";
-function isStartupCrashOutput(exitCode, errors, log, userStrings = []) {
-  if (exitCode === void 0 || exitCode < 0 || exitCode >= 3221225472) return true;
-  const clean = (l) => {
-    let s = l;
-    for (const u2 of userStrings) if (u2) s = s.split(u2).join(" ");
-    return s;
-  };
-  if (log.some((l) => !l.startsWith("$ ") && STARTUP_CRASH.test(clean(l)))) return true;
-  return errors.length === 0;
-}
-async function freeDiskBytes(path12, statfs3 = (p) => fsStatfs2(p)) {
-  let cur = resolve(path12);
-  while (!existsSync6(cur)) {
-    const up = dirname2(cur);
-    if (up === cur) break;
-    cur = up;
-  }
-  const s = await statfs3(cur);
-  return Number(s.bavail) * Number(s.bsize);
-}
-function defaultAeCacheDir() {
-  return process.env["EDITMCP_AE_CACHE_DIR"] || process.env["LOCALAPPDATA"] || os3.tmpdir();
-}
-function estimateOutputBytes(frames3, width = 1920, height = 1080, fallback = false) {
-  return frames3 * width * height * (fallback ? 4.5 : 0.45);
-}
-function driveOf(p) {
-  const root = parse3(resolve(p)).root;
-  return process.platform === "win32" ? root.toLowerCase() : root;
-}
-async function checkRenderDiskSpace(req, frames3, opts) {
-  const est = req.estimatedBytes ?? estimateOutputBytes(frames3, req.width, req.height, req.fallback);
-  const need = Math.max((opts.minFreeGb ?? 5) * GB2, 2 * est);
-  const checks = [{ path: dirname2(resolve(req.outPath)), what: "output" }, { path: opts.cacheDir ?? defaultAeCacheDir(), what: "AE disk cache" }];
-  const seen = /* @__PURE__ */ new Set();
-  const notes = [];
-  for (const c3 of checks) {
-    const drive = driveOf(c3.path);
-    if (seen.has(drive)) continue;
-    seen.add(drive);
-    let free;
-    try {
-      free = await freeDiskBytes(c3.path, opts.statfs);
-    } catch (e) {
-      notes.push(`WARN disk space check skipped for ${c3.path}: ${e instanceof Error ? e.message : String(e)}`);
-      continue;
-    }
-    if (free < need) {
-      const f = (free / GB2).toFixed(1), n2 = (need / GB2).toFixed(1);
-      throw new DiskSpaceError(
-        `\u0E1E\u0E37\u0E49\u0E19\u0E17\u0E35\u0E48\u0E14\u0E34\u0E2A\u0E01\u0E4C\u0E44\u0E21\u0E48\u0E1E\u0E2D\u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A render: \u0E44\u0E14\u0E23\u0E1F\u0E4C ${drive} (${c3.what}) \u0E40\u0E2B\u0E25\u0E37\u0E2D ${f} GB \u0E15\u0E49\u0E2D\u0E07\u0E21\u0E35\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E19\u0E49\u0E2D\u0E22 ${n2} GB \u2014 \u0E25\u0E1A\u0E44\u0E1F\u0E25\u0E4C\u0E40\u0E01\u0E48\u0E32\u0E2B\u0E23\u0E37\u0E2D\u0E25\u0E49\u0E32\u0E07 cache \u0E02\u0E2D\u0E07 AE (ae_purge_cache) \u0E01\u0E48\u0E2D\u0E19 / not enough disk space to render: ${drive} (${c3.what}) has ${f} GB free, need ${n2} GB (max(${opts.minFreeGb ?? 5} GB, 2 \xD7 estimated output ${(est / GB2).toFixed(2)} GB)); free space or purge the AE cache first`,
-        c3.path,
-        free,
-        need
-      );
-    }
-  }
-  return notes.length ? notes.join("\n") : void 0;
-}
-async function purgeIfLowCacheSpace(backend, policy = {}) {
-  if (policy.enabled === false) return { purged: false, reason: "disabled" };
-  if (!backend.purgeCaches) return { purged: false, reason: "backend cannot purge caches" };
-  const dir = policy.cacheDir ?? defaultAeCacheDir();
-  const below = policy.belowGb ?? 20;
-  let before;
-  try {
-    before = await freeDiskBytes(dir, policy.statfs) / GB2;
-  } catch {
-  }
-  if (before === void 0 ? below !== Infinity : before >= below) {
-    return { purged: false, reason: before === void 0 ? "free space unknown" : `cache drive has ${before.toFixed(1)} GB free (>= ${below} GB)`, ...before !== void 0 ? { freeGbBefore: before } : {} };
-  }
-  try {
-    await backend.purgeCaches();
-  } catch (e) {
-    return { purged: false, reason: `purge failed: ${e instanceof Error ? e.message : String(e)}`, ...before !== void 0 ? { freeGbBefore: before } : {} };
-  }
-  let after;
-  try {
-    after = await freeDiskBytes(dir, policy.statfs) / GB2;
-  } catch {
-  }
-  return { purged: true, reason: before === void 0 ? "forced" : `cache drive had ${before.toFixed(1)} GB free (< ${below} GB)`, ...before !== void 0 ? { freeGbBefore: before } : {}, ...after !== void 0 ? { freeGbAfter: after } : {} };
-}
-function isMissingOmTemplate(error2, userStrings = []) {
-  if (!(error2 instanceof AerenderError) || error2.reason !== "exit" && error2.reason !== "output") return false;
-  return error2.errors.some((line) => {
-    let l = line;
-    for (const s of userStrings) if (s) l = l.split(s).join(" ");
-    l = l.replace(/"[^"]*"|'[^']*'|“[^”]*”/g, " ");
-    return /output[- ]module template/i.test(l) && /\bno output[- ]module template\b|\b(?:not|never) (?:been )?found\b|could not be found|does not exist|unable to find/i.test(l);
-  });
-}
-function defaultMfrPercent(freeGb = os3.freemem() / 2 ** 30) {
-  if (freeGb >= 16) return 90;
-  if (freeGb >= 8) return 70;
-  if (freeGb >= 4) return 50;
-  return 25;
-}
-function isAscii(s) {
-  return /^[\x00-\x7f]*$/.test(s);
-}
-function uniqueOutputPath(path12) {
-  if (!existsSync6(path12)) return path12;
-  const dir = dirname2(path12);
-  const ext = extname2(path12);
-  const stem = basename2(path12, ext);
-  for (let n2 = 2; n2 < 1e4; n2++) {
-    const cand = join3(dir, `${stem}_${n2}${ext}`);
-    if (!existsSync6(cand)) return cand;
-  }
-  throw new Error(`cannot find a free output name for ${path12}`);
-}
-function asciiTempPath(outPath) {
-  const ext = extname2(outPath).toLowerCase() || ".mov";
-  const dir = isAscii(dirname2(outPath)) ? dirname2(outPath) : join3(os3.tmpdir(), "editmcp-ae");
-  if (!isAscii(dir)) throw new Error("After Effects requires an ASCII TEMP directory");
-  mkdirSync2(dir, { recursive: true });
-  const safeStem = basename2(outPath, extname2(outPath)).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 24) || "render";
-  const prefix = `aer_${randomBytes4(4).toString("hex")}_${safeStem}`;
-  const sequence = IMAGE_EXT.has(ext);
-  const tmp = sequence ? join3(dir, `${prefix}_[#####]${ext}`) : join3(dir, `${prefix}${ext}`);
-  return { tmp, sequence, prefix, dir };
-}
-async function moveFile(from, to) {
-  if (existsSync6(to)) throw new Error(`refusing to overwrite ${to}`);
-  mkdirSync2(dirname2(to), { recursive: true });
-  try {
-    await link2(from, to);
-    await unlink2(from);
-  } catch (e) {
-    if (!["EXDEV", "EPERM", "ENOTSUP"].includes(e.code ?? "")) throw e;
-    await copyFile2(from, to, constants5.COPYFILE_EXCL);
-    await unlink2(from);
-  }
-}
-async function killTree(pid, spawn2, child2) {
-  if (pid && process.platform === "win32") {
-    try {
-      await spawn2("taskkill", ["/T", "/F", "/PID", String(pid)], { reject: false, windowsHide: true, timeout: 1e4 });
-    } catch {
-    }
-  }
-  try {
-    child2?.kill?.("SIGKILL");
-  } catch {
-  }
-}
-async function probeFrameCount(tools, path12, spawn2 = execa, signal) {
-  const r = await spawn2(tools.ffprobe, [
-    "-v",
-    "error",
-    "-select_streams",
-    "v:0",
-    "-count_packets",
-    "-show_entries",
-    "stream=nb_read_packets",
-    "-of",
-    "csv=p=0",
-    path12
-  ], { reject: false, windowsHide: true, timeout: 12e4, cancelSignal: signal });
-  const n2 = parseInt(String(r.stdout).trim(), 10);
-  if (r.exitCode !== 0 || !Number.isFinite(n2)) throw new Error(`ffprobe could not count frames of ${path12}: ${r.stderr}`);
-  return n2;
-}
-async function transcodeToProres(tools, src, dst, spawn2 = execa, signal) {
-  const r = await spawn2(tools.ffmpeg, [
-    "-hide_banner",
-    "-nostdin",
-    "-n",
-    "-i",
-    src,
-    "-map",
-    "0:v:0",
-    "-map",
-    "0:a:0?",
-    "-c:a",
-    "pcm_s24le",
-    "-ar",
-    "48000",
-    "-ac",
-    "2",
-    // setparams tags the frames themselves; newer ffmpeg takes stream color info from frames over -color_* flags.
-    "-vf",
-    "scale=out_color_matrix=bt709:out_range=tv,format=yuv422p10le,setparams=range=tv:color_primaries=bt709:color_trc=bt709:colorspace=bt709",
-    "-c:v",
-    "prores_ks",
-    "-profile:v",
-    "3",
-    "-vendor",
-    "apl0",
-    "-pix_fmt",
-    "yuv422p10le",
-    "-colorspace",
-    "bt709",
-    "-color_primaries",
-    "bt709",
-    "-color_trc",
-    "bt709",
-    "-color_range",
-    "tv",
-    dst
-  ], { reject: false, windowsHide: true, timeout: 4 * 60 * 6e4, cancelSignal: signal });
-  if (r.exitCode !== 0 || !existsSync6(dst)) throw new Error(`ffmpeg ProRes transcode failed: ${r.stderr}`);
-}
-function gate(max) {
-  let g = gates.get(max);
-  if (!g) {
-    g = new Semaphore(max);
-    gates.set(max, g);
-  }
-  return g;
-}
-function createProgressParser(knownTotal) {
-  let fps;
-  let durationTc;
-  let total = knownTotal;
-  let done = 0;
-  const errors = [];
-  return {
-    get total() {
-      return total;
-    },
-    get done() {
-      return done;
-    },
-    errors,
-    feed(line) {
-      const l = line.trim();
-      if (!l) return void 0;
-      if (/aerender ERROR/i.test(l) || /^ERROR:/i.test(l)) errors.push(l);
-      let m = RE_FPS.exec(l);
-      if (m) {
-        fps = parseFloat(m[1]);
-        if (durationTc && total === void 0) total = tcToFrames(durationTc, fps);
-        return void 0;
-      }
-      m = RE_DURATION.exec(l);
-      if (m) {
-        durationTc = m[1];
-        if (fps && total === void 0) total = tcToFrames(durationTc, fps);
-        return void 0;
-      }
-      m = RE_FRAME.exec(l);
-      if (m) {
-        done = parseInt(m[2], 10);
-        return { stage: "aerender", done, total: total ?? Math.max(done, 1), message: m[1] };
-      }
-      return void 0;
-    }
-  };
-}
-function buildArgs(req, tmpOut) {
-  const offset = req.frameOffset ?? 0;
-  const args = [
-    "-project",
-    req.aep,
-    "-comp",
-    req.comp,
-    "-RStemplate",
-    req.rsTemplate,
-    "-OMtemplate",
-    req.omTemplate,
-    "-output",
-    tmpOut,
-    "-s",
-    String(offset + req.startFrame),
-    "-e",
-    String(offset + req.endFrame)
-  ];
-  if (req.mfrPercent !== void 0) args.push("-mfr", "ON", String(Math.max(1, Math.min(100, Math.round(req.mfrPercent)))));
-  args.push("-close", "DO_NOT_SAVE_CHANGES", "-sound", "OFF");
-  return args;
-}
-function findSequenceFiles(dir, prefix) {
-  try {
-    return readdirSync2(dir).filter((f) => f.startsWith(prefix) && !f.includes("[")).map((f) => join3(dir, f)).sort();
-  } catch {
-    return [];
-  }
-}
-function findRenderedFile(tmp, prefix, dir) {
-  if (existsSync6(tmp)) return tmp;
-  const cands = findSequenceFiles(dir, prefix);
-  return cands[0];
-}
-async function removeTempOutputs(dir, prefix) {
-  let names;
-  try {
-    names = readdirSync2(dir).filter((f) => f.startsWith(prefix));
-  } catch {
-    return;
-  }
-  for (const name of names) {
-    for (let attempt = 0; attempt < 5; attempt++) {
-      try {
-        await unlink2(join3(dir, name));
-        break;
-      } catch (e) {
-        const code = e.code;
-        if (code === "ENOENT" || attempt === 4) break;
-        await new Promise((r) => setTimeout(r, 200));
-      }
-    }
-  }
-}
-async function aerender(tools, req, opts = {}) {
-  const spawn2 = opts.spawn ?? execa;
-  if (!tools.aerender) throw new Error("aerender.exe not found (ToolPaths.aerender). Install After Effects or set EDITMCP_AE_DIR.");
-  if (!existsSync6(req.aep)) throw new Error(`project not found: ${req.aep}`);
-  const { startFrame, endFrame } = req;
-  if (startFrame === void 0 || endFrame === void 0 || !Number.isInteger(startFrame) || !Number.isInteger(endFrame) || startFrame < 0) {
-    throw new Error("aerender needs an explicit non-negative integer startFrame/endFrame (0-based comp frames)");
-  }
-  if (endFrame < startFrame) throw new Error(`endFrame ${endFrame} < startFrame ${startFrame}`);
-  const maxParallel = opts.maxParallel ?? Math.max(1, parseInt(process.env["EDITMCP_AE_PARALLEL"] ?? "1", 10) || 1);
-  const release = await gate(maxParallel).acquire();
-  try {
-    req.signal?.throwIfAborted();
-    const diskNote = opts.checkDisk === false ? void 0 : await checkRenderDiskSpace(req, endFrame - startFrame + 1, opts);
-    let r;
-    try {
-      r = await renderOnce(tools, req, spawn2, startFrame, endFrame);
-    } catch (error2) {
-      if (opts.retryStartupCrash === false || !(error2 instanceof AerenderError) || !error2.startupCrash || req.signal?.aborted) throw error2;
-      const delay2 = opts.retryDelayMs ?? 3e3;
-      if (delay2 > 0) await new Promise((res) => setTimeout(res, delay2));
-      req.signal?.throwIfAborted();
-      r = await renderOnce(tools, req, spawn2, startFrame, endFrame);
-      r = { ...r, log: `retry: first attempt crashed during startup (${error2.message.split("\n")[0]})
-${r.log}` };
-    }
-    return diskNote ? { ...r, log: `${diskNote}
-${r.log}` } : r;
-  } finally {
-    release();
-  }
-}
-async function renderOnce(tools, req, spawn2, startFrame, endFrame) {
-  const t0 = Date.now();
-  const log = [];
-  const pushLog = (l) => {
-    if (log.length < MAX_LOG_LINES) log.push(l);
-  };
-  let temp;
-  try {
-    req.signal?.throwIfAborted();
-    const freeGb = os3.freemem() / 2 ** 30;
-    const minFree = req.minFreeRamGb ?? 0.75;
-    if (freeGb < minFree) {
-      const msg = `low free RAM: ${freeGb.toFixed(2)} GB (< ${minFree} GB)`;
-      if (req.strictRam) throw new Error(msg);
-      pushLog(`WARN ${msg}`);
-    }
-    const { tmp, sequence, prefix, dir } = asciiTempPath(req.outPath);
-    temp = { dir, prefix };
-    const args = buildArgs(req, tmp);
-    pushLog(`$ aerender ${args.map((a2) => /\s/.test(a2) ? `"${a2}"` : a2).join(" ")}`);
-    const expected = endFrame - startFrame + 1;
-    const parser = createProgressParser(expected);
-    const onLine = (line) => {
-      pushLog(line);
-      const p = parser.feed(line);
-      if (p) req.onProgress?.(p);
-    };
-    const child2 = spawn2(tools.aerender, args, {
-      // checked by aerender()
-      reject: false,
-      windowsHide: true,
-      timeout: 0,
-      stripFinalNewline: false
-    });
-    let streamed = false;
-    for (const s of [child2.stdout, child2.stderr]) {
-      if (s && typeof s.on === "function") {
-        streamed = true;
-        let buf = "";
-        s.on("data", (chunk) => {
-          buf += chunk.toString();
-          let i2;
-          while ((i2 = buf.search(/\r\n|\n|\r/)) >= 0) {
-            onLine(buf.slice(0, i2));
-            buf = buf.slice(i2 + (buf[i2] === "\r" && buf[i2 + 1] === "\n" ? 2 : 1));
-          }
-        });
-        s.on("end", () => {
-          if (buf) onLine(buf);
-        });
-      }
-    }
-    let killed;
-    const timeoutMs = req.timeoutMs ?? 4 * 60 * 60 * 1e3;
-    const timer = timeoutMs > 0 ? setTimeout(() => {
-      killed = "timeout";
-      void killTree(child2.pid, spawn2, child2);
-    }, timeoutMs) : void 0;
-    const onAbort = () => {
-      killed = "abort";
-      void killTree(child2.pid, spawn2, child2);
-    };
-    req.signal?.addEventListener("abort", onAbort, { once: true });
-    let res;
-    try {
-      res = await child2;
-    } finally {
-      if (timer) clearTimeout(timer);
-      req.signal?.removeEventListener("abort", onAbort);
-    }
-    if (!streamed) {
-      for (const text2 of [res.stdout, res.stderr]) {
-        if (typeof text2 === "string") for (const line of text2.split(/\r?\n/)) onLine(line);
-      }
-    }
-    if (killed) {
-      throw new AerenderError(`aerender ${killed === "timeout" ? `timed out after ${timeoutMs} ms` : "aborted"} (process tree killed)
-${tail3(log)}`, killed, parser.errors);
-    }
-    if (res.exitCode !== 0) {
-      const err2 = new AerenderError(`aerender exited with code ${res.exitCode}${parser.errors.length ? ": " + parser.errors.join(" | ") : ""}
-${tail3(log)}`, "exit", parser.errors);
-      throw new AerenderError(err2.message, "exit", parser.errors, parser.done === 0 && isStartupCrashOutput(res.exitCode, parser.errors, log, [req.comp, req.aep, req.omTemplate]) && !isMissingOmTemplate(err2, [req.comp, req.aep, req.omTemplate]));
-    }
-    let produced;
-    let frames3;
-    if (sequence) {
-      const files = findSequenceFiles(dir, prefix);
-      if (files.length === 0) throw new AerenderError(`aerender produced no frames in ${dir}
-${tail3(log)}`, "output", parser.errors);
-      if (files.length !== expected) throw new AerenderError(`aerender frame count mismatch: got ${files.length} images, expected ${expected} (${req.comp})
-${tail3(log)}`, "frames", parser.errors);
-      if (files.length > 1) throw new AerenderError("image-sequence output supports a single frame only", "output", parser.errors);
-      produced = files[0];
-      frames3 = 1;
-    } else {
-      produced = findRenderedFile(tmp, prefix, dir);
-      if (!produced) throw new AerenderError(`aerender produced no output file (${tmp})${parser.errors.length ? ": " + parser.errors.join(" | ") : ""}
-${tail3(log)}`, "output", parser.errors);
-      if (req.fallback) {
-        const prores = join3(dir, `${prefix}_prores.mov`);
-        pushLog(`fallback: transcoding ${basename2(produced)} \u2192 ProRes 422 HQ (BT.709)`);
-        await transcodeToProres(tools, produced, prores, spawn2, req.signal);
-        await unlink2(produced).catch(() => void 0);
-        produced = prores;
-      }
-      frames3 = await probeFrameCount(tools, produced, spawn2, req.signal);
-      if (frames3 !== expected) {
-        throw new AerenderError(`aerender frame count mismatch: got ${frames3}, expected ${expected} (${req.comp})
-${tail3(log)}`, "frames", parser.errors);
-      }
-    }
-    const finalPath = uniqueOutputPath(req.outPath);
-    if (sequence && extname2(produced).toLowerCase() !== extname2(finalPath).toLowerCase()) {
-      const alt = uniqueOutputPath(finalPath.slice(0, -extname2(finalPath).length) + extname2(produced));
-      await moveFile(produced, alt);
-      return { path: alt, frames: frames3, elapsedMs: Date.now() - t0, usedFallback: !!req.fallback, log: log.join("\n") };
-    }
-    await moveFile(produced, finalPath);
-    pushLog(`\u2192 ${finalPath} (${frames3} frames, ${statSync2(finalPath).size} bytes)`);
-    return { path: finalPath, frames: frames3, elapsedMs: Date.now() - t0, usedFallback: !!req.fallback, log: log.join("\n") };
-  } catch (error2) {
-    if (temp) await removeTempOutputs(temp.dir, temp.prefix);
-    throw error2;
-  }
-}
-function tail3(log, n2 = 15) {
-  return log.slice(-n2).join("\n");
-}
-var AerenderError, STARTUP_CRASH, GB2, DiskSpaceError, IMAGE_EXT, MAX_LOG_LINES, Semaphore, gates, RE_FRAME, RE_DURATION, RE_FPS;
-var init_aerender = __esm({
-  "src/engine/aerender.ts"() {
-    "use strict";
-    init_execa();
-    init_timecode();
-    AerenderError = class extends Error {
-      /** startupCrash: non-zero exit before any frame was rendered that looks like a crash, not a usage error. */
-      constructor(message, reason, errors, startupCrash = false) {
-        super(message);
-        this.reason = reason;
-        this.errors = errors;
-        this.startupCrash = startupCrash;
-        this.name = "AerenderError";
-      }
-      reason;
-      errors;
-      startupCrash;
-    };
-    STARTUP_CRASH = /crash|unexpected(?:ly)?\s+(?:quit|exit|terminat)|access violation|0xc0000005|unhandled exception|failed to (?:start|launch|initiali[sz]e)|unable to (?:start|launch|initiali[sz]e)|could not (?:start|launch|initiali[sz]e|connect)|after effects (?:has )?(?:stopped|quit|crashed)/i;
-    GB2 = 2 ** 30;
-    DiskSpaceError = class extends Error {
-      constructor(message, path12, freeBytes, needBytes) {
-        super(message);
-        this.path = path12;
-        this.freeBytes = freeBytes;
-        this.needBytes = needBytes;
-        this.name = "DiskSpaceError";
-      }
-      path;
-      freeBytes;
-      needBytes;
-    };
-    IMAGE_EXT = /* @__PURE__ */ new Set([".png", ".tif", ".tiff", ".jpg", ".jpeg", ".psd", ".exr", ".dpx", ".tga", ".bmp"]);
-    MAX_LOG_LINES = 4e3;
-    Semaphore = class {
-      constructor(max) {
-        this.max = max;
-      }
-      max;
-      queue = [];
-      active = 0;
-      async acquire() {
-        if (this.active < this.max) {
-          this.active++;
-          return () => this.release();
-        }
-        await new Promise((res) => this.queue.push(res));
-        return () => this.release();
-      }
-      release() {
-        const next = this.queue.shift();
-        if (next) next();
-        else this.active--;
-      }
-    };
-    gates = /* @__PURE__ */ new Map();
-    RE_FRAME = /^PROGRESS:\s+(-?\d+:\d+:\d+:\d+)\s+\((\d+)\)/;
-    RE_DURATION = /^PROGRESS:\s+Duration:\s+(\d+:\d+:\d+:\d+)/;
-    RE_FPS = /^PROGRESS:\s+Frame Rate:\s+([\d.]+)/;
+    WIN_ABS2 = /^(?:[A-Za-z]:[\\/]|\\\\)/;
   }
 });
 
@@ -29310,14 +29963,15 @@ var ae_exports = {};
 __export(ae_exports, {
   MockAeBackend: () => MockAeBackend,
   createAeBackend: () => createAeBackend,
+  doScriptFile: () => doScriptFile,
   lintMockComp: () => lintMockComp,
   listAfterFxProcesses: () => listAfterFxProcesses,
   scanMockComp: () => scanMockComp
 });
-import { constants as constants6, existsSync as existsSync7 } from "node:fs";
-import { copyFile as copyFile3, mkdir as mkdir5, mkdtemp, readFile as readFile4, readdir as readdir2, rename as rename4, rm as rm3, writeFile as writeFile4 } from "node:fs/promises";
-import os4 from "node:os";
-import { basename as basename3, dirname as dirname3, extname as extname3, join as join4, resolve as resolve2 } from "node:path";
+import { constants as constants6, existsSync as existsSync9 } from "node:fs";
+import { copyFile as copyFile3, mkdir as mkdir6, mkdtemp as mkdtemp3, readFile as readFile5, readdir as readdir2, rename as rename5, rm as rm4, writeFile as writeFile5 } from "node:fs/promises";
+import os7 from "node:os";
+import { basename as basename5, dirname as dirname4, extname as extname3, join as join7, resolve as resolve2 } from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 import { randomUUID } from "node:crypto";
 function runnerRules(rules) {
@@ -29334,7 +29988,10 @@ function serial(fn) {
   return result;
 }
 async function listAfterFxProcesses(spawn2 = execa) {
-  if (process.platform !== "win32") return [];
+  if (process.platform !== "win32") {
+    const procs = await listPosixProcesses();
+    return procs.filter((p) => isBundleProcess(p.command, /^Adobe After Effects\b/i)).map((p) => ({ name: basename5(p.command), pid: p.pid, title: p.command.replace(/^.*\/([^/]+)\.app\/.*$/, "$1") }));
+  }
   const r = await spawn2("tasklist", ["/V", "/FO", "CSV", "/NH", "/FI", "IMAGENAME eq AfterFX.exe"], { reject: false, windowsHide: true, timeout: 15e3 });
   const out2 = [];
   for (const line of String(r.stdout ?? "").split(/\r?\n/)) {
@@ -29343,6 +30000,34 @@ async function listAfterFxProcesses(spawn2 = execa) {
     out2.push({ name: cells[0], pid: Number(cells[1]), title: cells.length >= 9 ? cells[cells.length - 1] : "" });
   }
   return out2;
+}
+function isMacBundle(afterfx) {
+  return /\.app\/?$/i.test(afterfx);
+}
+function doScriptFile(app, jsx, timeoutMs) {
+  const q = (v) => `"${v.replace(/[\\"]/g, (c3) => `\\${c3}`)}"`;
+  return [
+    `with timeout of ${Math.ceil(timeoutMs / 1e3)} seconds`,
+    `  tell application ${q(basename5(app).replace(/\.app\/?$/i, ""))} to DoScriptFile ${q(jsx)}`,
+    "end timeout"
+  ].join("\n");
+}
+async function waitForAeExit(list, waitMs) {
+  const until = Date.now() + waitMs;
+  for (; ; ) {
+    const left = await list().catch(() => []);
+    if (!left.length) return;
+    if (Date.now() >= until) {
+      for (const p of left) {
+        try {
+          process.kill(p.pid, "SIGKILL");
+        } catch {
+        }
+      }
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
 }
 function guiWindows(procs) {
   return procs.filter((p) => p.title && !/^n\/a$/i.test(p.title.trim()));
@@ -29371,20 +30056,25 @@ function createAeBackend(tools, opts = {}) {
   async function run6(action, payload = {}) {
     if (!tools.afterfx) throw new UserActionError("AfterFX not found; install After Effects or set EDITMCP_AE_DIR", ACTIONS.aeNotFound());
     const minRam = opts.minFreeRamGb ?? 0.75;
-    if (os4.freemem() / 2 ** 30 < minRam) throw new Error(`not enough free RAM for After Effects (need ${minRam} GB)`);
-    const tempRoot = os4.tmpdir();
+    if (freeRamBytes() / 2 ** 30 < minRam) throw new Error(`not enough free RAM for After Effects (need ${minRam} GB)`);
+    const tempRoot = os7.tmpdir();
     if (!isAscii(tempRoot)) throw new Error("After Effects needs an ASCII TEMP directory; set TEMP/TMP to an ASCII path");
-    const dir = await mkdtemp(join4(tempRoot, "editmcp-ae-"));
+    const dir = await mkdtemp3(join7(tempRoot, "editmcp-ae-"));
     try {
-      const jobPath = join4(dir, "job.json");
-      const resultPath = join4(dir, "job.result.json");
-      await writeFile4(jobPath, JSON.stringify({ ...payload, action, result: resultPath }).replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029"), "utf8");
-      const launcher = join4(dir, "launch.jsx");
-      await writeFile4(launcher, `var EDITMCP_JOB = ${JSON.stringify(jobPath)};
+      const jobPath = join7(dir, "job.json");
+      const resultPath = join7(dir, "job.result.json");
+      await writeFile5(jobPath, JSON.stringify({ ...payload, action, result: resultPath }).replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029"), "utf8");
+      const launcher = join7(dir, "launch.jsx");
+      await writeFile5(launcher, `var EDITMCP_JOB = ${JSON.stringify(jobPath)};
 $.evalFile(new File(${JSON.stringify(runner)}));
 `, "utf8");
       const timeoutMs = action === "list" || action === "version" ? shortTimeout : longTimeout;
-      const child2 = spawn2(tools.afterfx, ["-m", "-noui", "-r", launcher], { reject: false, windowsHide: true, timeout: 0 });
+      const mac = isMacBundle(tools.afterfx);
+      if (mac) {
+        const open3 = await listProcesses().catch(() => []);
+        if (open3.length) throw new UserActionError(`After Effects is open (PID ${open3.map((p) => p.pid).join(", ")})`, ACTIONS.aeCloseMac());
+      }
+      const child2 = mac ? spawn2("osascript", ["-e", doScriptFile(tools.afterfx, launcher, timeoutMs)], { reject: false, timeout: 0 }) : spawn2(tools.afterfx, ["-m", "-noui", "-r", launcher], { reject: false, windowsHide: true, timeout: 0 });
       let timedOut = false;
       const timer = setTimeout(() => {
         timedOut = true;
@@ -29396,10 +30086,13 @@ $.evalFile(new File(${JSON.stringify(runner)}));
       } finally {
         clearTimeout(timer);
       }
+      if (mac) await waitForAeExit(listProcesses, timedOut ? 0 : opts.macQuitWaitMs ?? 6e4);
       if (timedOut) throw new Error(`AfterFX ${action} timed out after ${timeoutMs} ms (process tree killed)`);
-      const report2 = await readFile4(resultPath, "utf8").catch(() => void 0);
-      if (report2 === void 0) throw await noResult(action, output.exitCode, String(output.stderr ?? "").slice(-500));
-      if (output.exitCode !== 0) throw new Error(`AfterFX failed (${output.exitCode}): ${report2}`);
+      const report2 = await readFile5(resultPath, "utf8").catch(() => void 0);
+      const stderr = String(output.stderr ?? "").slice(-500);
+      if (mac && report2 === void 0 && /-1743|not authori[sz]ed/i.test(stderr)) throw new UserActionError(`osascript: ${stderr.trim()}`, ACTIONS.macAutomation());
+      if (report2 === void 0) throw await noResult(action, output.exitCode, stderr);
+      if (!mac && output.exitCode !== 0) throw new Error(`AfterFX failed (${output.exitCode}): ${report2}`);
       const result = JSON.parse(report2.replace(/^\uFEFF/, ""));
       if (result.ok !== true) {
         if (/cannot write /.test(result.error ?? "") && (await scriptingPref()).allowed === false) {
@@ -29409,7 +30102,7 @@ $.evalFile(new File(${JSON.stringify(runner)}));
       }
       return result;
     } finally {
-      await rm3(dir, { recursive: true, force: true });
+      await rm4(dir, { recursive: true, force: true });
     }
   }
   function timingOf2(v) {
@@ -29467,10 +30160,10 @@ $.evalFile(new File(${JSON.stringify(runner)}));
     }
     collect(snapshot2);
     for (const file of sequences) {
-      const stem = basename3(file, extname3(file));
+      const stem = basename5(file, extname3(file));
       const prefix = stem.replace(/\d+$/, "");
-      for (const entry of await readdir2(dirname3(file), { withFileTypes: true })) {
-        if (entry.isFile() && entry.name.startsWith(prefix) && extname3(entry.name).toLowerCase() === extname3(file).toLowerCase()) files.add(join4(dirname3(file), entry.name));
+      for (const entry of await readdir2(dirname4(file), { withFileTypes: true })) {
+        if (entry.isFile() && entry.name.startsWith(prefix) && extname3(entry.name).toLowerCase() === extname3(file).toLowerCase()) files.add(join7(dirname4(file), entry.name));
       }
     }
     const media2 = {};
@@ -29489,9 +30182,9 @@ $.evalFile(new File(${JSON.stringify(runner)}));
     const source2 = resolve2(req.aep);
     const savedTo = req.saveAs ? resolve2(req.saveAs) : source2;
     if (req.saveAs && savedTo.toLowerCase() === source2.toLowerCase()) throw new Error("saveAs must differ from the source; omit it for an in-place edit with backup");
-    if (req.saveAs && existsSync7(savedTo)) throw new Error(`refusing to overwrite ${savedTo}`);
+    if (req.saveAs && existsSync9(savedTo)) throw new Error(`refusing to overwrite ${savedTo}`);
     const before = await hashFile(source2);
-    const working = join4(dirname3(source2), `.editmcp-${randomUUID()}${extname3(source2) || ".aep"}`);
+    const working = join7(dirname4(source2), `.editmcp-${randomUUID()}${extname3(source2) || ".aep"}`);
     await copyFile3(source2, working, constants6.COPYFILE_EXCL);
     try {
       const result = await run6("edit", { aep: working, comp: req.comp, ops: req.ops });
@@ -29507,38 +30200,38 @@ $.evalFile(new File(${JSON.stringify(runner)}));
         const gui = guiWindows(await listProcesses().catch(() => []));
         if (gui.length) {
           aeGuiRunning = true;
-          const name = basename3(source2).toLowerCase();
+          const name = basename5(source2).toLowerCase();
           const showing = gui.some((p) => p.title.toLowerCase().includes(name));
           warning = `After Effects GUI is running${showing ? " with this project open" : ""} (PID ${gui.map((p) => p.pid).join(", ")}): saving there will overwrite this edit. Close it without saving and reopen, or use saveAs to write a new .aep. / After Effects \u0E40\u0E1B\u0E34\u0E14\u0E2D\u0E22\u0E39\u0E48 \u0E16\u0E49\u0E32\u0E01\u0E14 save \u0E43\u0E19\u0E42\u0E1B\u0E23\u0E41\u0E01\u0E23\u0E21 \u0E01\u0E32\u0E23\u0E41\u0E01\u0E49\u0E44\u0E02\u0E19\u0E35\u0E49\u0E08\u0E30\u0E2B\u0E32\u0E22 \u0E43\u0E2B\u0E49\u0E1B\u0E34\u0E14\u0E41\u0E25\u0E49\u0E27\u0E40\u0E1B\u0E34\u0E14\u0E43\u0E2B\u0E21\u0E48 \u0E2B\u0E23\u0E37\u0E2D\u0E43\u0E0A\u0E49 saveAs`;
           log.push(`WARNING: ${warning}`);
         }
-        const backup = uniqueOutputPath(join4(dirname3(source2), `${basename3(source2, extname3(source2))}_backup_${Date.now()}.aep`));
+        const backup = uniqueOutputPath(join7(dirname4(source2), `${basename5(source2, extname3(source2))}_backup_${Date.now()}.aep`));
         await copyFile3(source2, backup, constants6.COPYFILE_EXCL);
         log.push(`backup: ${backup}`);
         if (await hashFile(source2) !== before) {
-          await rm3(backup, { force: true });
+          await rm4(backup, { force: true });
           throw new Error(changed);
         }
-        await rename4(working, source2);
+        await rename5(working, source2);
         timings.delete(source2.toLowerCase());
       }
       return { ok: true, savedTo, fingerprint, log, aeGuiRunning, ...warning ? { warning } : {} };
     } finally {
-      await rm3(working, { force: true });
+      await rm4(working, { force: true });
     }
   }
   async function create(req) {
     const savedTo = resolve2(req.saveAs);
     if (extname3(savedTo).toLowerCase() !== ".aep") throw new Error("saveAs must be a .aep path");
-    if (existsSync7(savedTo)) throw new Error(`refusing to overwrite ${savedTo}`);
-    const working = join4(dirname3(savedTo), `.editmcp-${randomUUID()}.aep`);
+    if (existsSync9(savedTo)) throw new Error(`refusing to overwrite ${savedTo}`);
+    const working = join7(dirname4(savedTo), `.editmcp-${randomUUID()}.aep`);
     try {
       const result = await run6("create", { jsx: req.jsx, saveAs: working, ...req.scriptDir ? { scriptDir: resolve2(req.scriptDir) } : {} });
-      if (!existsSync7(working)) throw new Error("After Effects did not save the new project");
+      if (!existsSync9(working)) throw new Error("After Effects did not save the new project");
       await copyFile3(working, savedTo, constants6.COPYFILE_EXCL);
       return { savedTo, comps: result.data ?? [], log: result.log ?? [] };
     } finally {
-      await rm3(working, { force: true });
+      await rm4(working, { force: true });
     }
   }
   async function render2(req) {
@@ -29597,18 +30290,18 @@ $.evalFile(new File(${JSON.stringify(runner)}));
       const t = await compTiming(aep, comp);
       if (frame2 >= t.durationFrames) throw new Error(`frame ${frame2} is past the end of ${comp} (${t.durationFrames} frames)`);
       const out2 = uniqueOutputPath(resolve2(outPng));
-      const tempRoot = os4.tmpdir();
+      const tempRoot = os7.tmpdir();
       if (!isAscii(tempRoot)) throw new Error("After Effects needs an ASCII TEMP directory");
-      const dir = await mkdtemp(join4(tempRoot, "editmcp-preview-"));
+      const dir = await mkdtemp3(join7(tempRoot, "editmcp-preview-"));
       try {
-        const clip = await aerender(tools, { aep: resolve2(aep), comp, startFrame: frame2, endFrame: frame2, frameOffset: t.displayStartFrame, outPath: join4(dir, "frame.mov"), omTemplate: "Lossless", rsTemplate: "Best Settings", strictRam: true, minFreeRamGb: opts.minFreeRamGb, ...t.width && t.height ? { width: t.width, height: t.height } : {} }, renderOpts);
-        const png = join4(dir, "frame.png");
+        const clip = await aerender(tools, { aep: resolve2(aep), comp, startFrame: frame2, endFrame: frame2, frameOffset: t.displayStartFrame, outPath: join7(dir, "frame.mov"), omTemplate: "Lossless", rsTemplate: "Best Settings", strictRam: true, minFreeRamGb: opts.minFreeRamGb, ...t.width && t.height ? { width: t.width, height: t.height } : {} }, renderOpts);
+        const png = join7(dir, "frame.png");
         const r = await spawn2(tools.ffmpeg, ["-hide_banner", "-nostdin", "-n", "-i", clip.path, "-frames:v", "1", png], { reject: false, windowsHide: true, timeout: 6e4 });
         if (r.exitCode !== 0) throw new Error(`PNG conversion failed: ${r.stderr}`);
         await moveFile(png, out2);
         return out2;
       } finally {
-        await rm3(dir, { recursive: true, force: true });
+        await rm4(dir, { recursive: true, force: true });
       }
     }),
     version: () => serial(async () => (await run6("version")).data),
@@ -29717,6 +30410,7 @@ var init_ae = __esm({
     "use strict";
     init_execa();
     init_hash();
+    init_platform();
     init_user_action();
     init_housekeeping();
     init_aerender();
@@ -29779,18 +30473,18 @@ var init_ae = __esm({
         this.calls.push(`render:${req.comp}`);
         const c3 = this.comp(req.comp);
         const out2 = uniqueOutputPath(resolve2(req.outPath));
-        await mkdir5(dirname3(out2), { recursive: true });
-        await writeFile4(out2, "mock render", { flag: "wx" });
-        const frames3 = (req.endFrame ?? c3.durationFrames - 1) - (req.startFrame ?? 0) + 1;
-        return { path: out2, frames: frames3, elapsedMs: 0, usedFallback: false, log: "mock" };
+        await mkdir6(dirname4(out2), { recursive: true });
+        await writeFile5(out2, "mock render", { flag: "wx" });
+        const frames4 = (req.endFrame ?? c3.durationFrames - 1) - (req.startFrame ?? 0) + 1;
+        return { path: out2, frames: frames4, elapsedMs: 0, usedFallback: false, log: "mock" };
       }
       async previewFrame(_aep, comp, frame2, outPng) {
         this.calls.push(`previewFrame:${comp}:${frame2}`);
         const c3 = this.comp(comp);
         if (!Number.isInteger(frame2) || frame2 < 0 || frame2 >= c3.durationFrames) throw new Error(`frame ${frame2} is past the end of ${comp} (${c3.durationFrames} frames)`);
         const out2 = uniqueOutputPath(resolve2(outPng));
-        await mkdir5(dirname3(out2), { recursive: true });
-        await writeFile4(out2, Buffer.from(PNG_1X1, "base64"), { flag: "wx" });
+        await mkdir6(dirname4(out2), { recursive: true });
+        await writeFile5(out2, Buffer.from(PNG_1X1, "base64"), { flag: "wx" });
         return out2;
       }
       async version() {
@@ -29968,16 +30662,16 @@ __export(effectcraft_exports, {
   createMotionBackend: () => createMotionBackend,
   isEcProject: () => isEcProject
 });
-import { constants as constants7, existsSync as existsSync8 } from "node:fs";
-import { copyFile as copyFile4, mkdir as mkdir6, mkdtemp as mkdtemp2, readFile as readFile5, rename as rename5, rm as rm4, writeFile as writeFile5 } from "node:fs/promises";
-import os5 from "node:os";
-import { basename as basename4, dirname as dirname4, extname as extname4, join as join5, resolve as resolve3 } from "node:path";
+import { constants as constants7, existsSync as existsSync10 } from "node:fs";
+import { copyFile as copyFile4, mkdir as mkdir7, mkdtemp as mkdtemp4, readFile as readFile6, rename as rename6, rm as rm5, writeFile as writeFile6 } from "node:fs/promises";
+import os8 from "node:os";
+import { basename as basename6, dirname as dirname5, extname as extname4, join as join8, resolve as resolve3 } from "node:path";
 import { fileURLToPath as fileURLToPath4 } from "node:url";
 import { randomUUID as randomUUID2 } from "node:crypto";
 async function readProject(ecproj) {
   let raw;
   try {
-    raw = await readFile5(ecproj, "utf8");
+    raw = await readFile6(ecproj, "utf8");
   } catch {
     throw new Error(`project not found: ${ecproj}`);
   }
@@ -30040,12 +30734,12 @@ function createEffectCraftBackend(tools, opts = {}) {
   const shortTimeout = opts.timeoutMs ?? 12e4;
   const scriptTimeout = opts.scriptTimeoutMs ?? Math.max(shortTimeout, 6e5);
   async function cli(args, timeoutMs, what, signal) {
-    const exe = tools.effectcraftCli;
-    if (!exe) throw new Error("effectcraft-cli not found; install EffectCraft or set EDITMCP_EFFECTCRAFT_DIR");
+    const exe2 = tools.effectcraftCli;
+    if (!exe2) throw new Error("effectcraft-cli not found; install EffectCraft or set EDITMCP_EFFECTCRAFT_DIR");
     const minRam = opts.minFreeRamGb ?? 0.75;
-    if (os5.freemem() / 2 ** 30 < minRam) throw new Error(`not enough free RAM for EffectCraft (need ${minRam} GB)`);
+    if (freeRamBytes() / 2 ** 30 < minRam) throw new Error(`not enough free RAM for EffectCraft (need ${minRam} GB)`);
     if (signal?.aborted) throw new Error("aborted");
-    const child2 = spawn2(exe, args, { reject: false, windowsHide: true, timeout: 0, stdin: "ignore" });
+    const child2 = spawn2(exe2, args, { reject: false, windowsHide: true, timeout: 0, stdin: "ignore" });
     let timedOut = false;
     const kill = () => {
       void killTree(child2.pid, spawn2, child2);
@@ -30069,17 +30763,17 @@ function createEffectCraftBackend(tools, opts = {}) {
     return stdout;
   }
   async function tempDir(prefix) {
-    const root = os5.tmpdir();
+    const root = os8.tmpdir();
     if (!isAscii(root)) throw new Error("EffectCraft renders go through an ASCII TEMP directory; set TEMP/TMP to an ASCII path");
-    return mkdtemp2(join5(root, prefix));
+    return mkdtemp4(join8(root, prefix));
   }
   async function runner(job, project2) {
     const dir = await tempDir("catcut-ec-");
     try {
-      const launch = join5(dir, "launch.jsx");
+      const launch = join8(dir, "launch.jsx");
       const literal2 = JSON.stringify(job).split(String.fromCharCode(8232)).join("\\u2028").split(String.fromCharCode(8233)).join("\\u2029");
-      await writeFile5(launch, `var CATCUT_JOB = ${literal2};
-${await readFile5(runnerPath, "utf8")}`, "utf8");
+      await writeFile6(launch, `var CATCUT_JOB = ${literal2};
+${await readFile6(runnerPath, "utf8")}`, "utf8");
       const args = ["script", launch];
       if (project2.open) args.push(project2.open);
       else args.push("--empty");
@@ -30093,7 +30787,7 @@ ${await readFile5(runnerPath, "utf8")}`, "utf8");
       if (res.ok !== true) throw new Error(`EffectCraft: ${res.error ?? "job failed"}`);
       return res;
     } finally {
-      await rm4(dir, { recursive: true, force: true });
+      await rm5(dir, { recursive: true, force: true });
     }
   }
   async function edit(req) {
@@ -30101,9 +30795,9 @@ ${await readFile5(runnerPath, "utf8")}`, "utf8");
     const savedTo = req.saveAs ? resolve3(req.saveAs) : source2;
     if (req.saveAs && !isEcProject(savedTo)) throw new Error("saveAs must be a .ecproj path");
     if (req.saveAs && savedTo.toLowerCase() === source2.toLowerCase()) throw new Error("saveAs must differ from the source; omit it for an in-place edit with backup");
-    if (req.saveAs && existsSync8(savedTo)) throw new Error(`refusing to overwrite ${savedTo}`);
+    if (req.saveAs && existsSync10(savedTo)) throw new Error(`refusing to overwrite ${savedTo}`);
     const before = await hashFile(source2);
-    const working = join5(dirname4(source2), `.catcut-${randomUUID2()}.ecproj`);
+    const working = join8(dirname5(source2), `.catcut-${randomUUID2()}.ecproj`);
     await copyFile4(source2, working, constants7.COPYFILE_EXCL);
     try {
       const res = await runner({ action: "edit", comp: req.comp, ops: req.ops }, { open: working, save: true });
@@ -30116,33 +30810,33 @@ ${await readFile5(runnerPath, "utf8")}`, "utf8");
         await copyFile4(working, savedTo, constants7.COPYFILE_EXCL);
       } else {
         log.push("note: an EffectCraft window with this project open would overwrite this edit on its next save / \u0E16\u0E49\u0E32\u0E40\u0E1B\u0E34\u0E14\u0E42\u0E1B\u0E23\u0E40\u0E08\u0E01\u0E15\u0E4C\u0E19\u0E35\u0E49\u0E43\u0E19 EffectCraft \u0E2D\u0E22\u0E39\u0E48 \u0E43\u0E2B\u0E49\u0E1B\u0E34\u0E14\u0E42\u0E14\u0E22\u0E44\u0E21\u0E48 save \u0E41\u0E25\u0E49\u0E27\u0E40\u0E1B\u0E34\u0E14\u0E43\u0E2B\u0E21\u0E48");
-        const backup = uniqueOutputPath(join5(dirname4(source2), `${basename4(source2, extname4(source2))}_backup_${Date.now()}.ecproj`));
+        const backup = uniqueOutputPath(join8(dirname5(source2), `${basename6(source2, extname4(source2))}_backup_${Date.now()}.ecproj`));
         await copyFile4(source2, backup, constants7.COPYFILE_EXCL);
         log.push(`backup: ${backup}`);
         if (await hashFile(source2) !== before) {
-          await rm4(backup, { force: true });
+          await rm5(backup, { force: true });
           throw new Error(changed);
         }
-        await rename5(working, source2);
+        await rename6(working, source2);
       }
       return { ok: true, savedTo, fingerprint, log };
     } finally {
-      await rm4(working, { force: true });
+      await rm5(working, { force: true });
     }
   }
   async function create(req) {
     const savedTo = resolve3(req.saveAs);
     if (!isEcProject(savedTo)) throw new Error("saveAs must be a .ecproj path");
-    if (existsSync8(savedTo)) throw new Error(`refusing to overwrite ${savedTo}`);
-    await mkdir6(dirname4(savedTo), { recursive: true });
-    const working = join5(dirname4(savedTo), `.catcut-${randomUUID2()}.ecproj`);
+    if (existsSync10(savedTo)) throw new Error(`refusing to overwrite ${savedTo}`);
+    await mkdir7(dirname5(savedTo), { recursive: true });
+    const working = join8(dirname5(savedTo), `.catcut-${randomUUID2()}.ecproj`);
     try {
       const res = await runner({ action: "create", jsx: req.jsx, ...req.scriptDir ? { scriptDir: resolve3(req.scriptDir) } : {} }, { saveAs: working });
-      if (!existsSync8(working)) throw new Error("EffectCraft did not save the new project");
+      if (!existsSync10(working)) throw new Error("EffectCraft did not save the new project");
       await copyFile4(working, savedTo, constants7.COPYFILE_EXCL);
       return { savedTo, comps: compsOf(await readProject(savedTo)).map(compInfo), log: res.log ?? [] };
     } finally {
-      await rm4(working, { force: true });
+      await rm5(working, { force: true });
     }
   }
   async function render2(req) {
@@ -30155,13 +30849,13 @@ ${await readFile5(runnerPath, "utf8")}`, "utf8");
     const endFrame = req.endFrame ?? durationFrames - 1;
     if (startFrame < 0 || endFrame < startFrame) throw new Error(`bad frame range ${startFrame}..${endFrame}`);
     if (endFrame >= durationFrames) throw new Error(`endFrame ${endFrame} is past the end of ${req.comp} (${durationFrames} frames)`);
-    const frames3 = endFrame - startFrame + 1;
+    const frames4 = endFrame - startFrame + 1;
     const dir = await tempDir("catcut-ecr-");
     const t0 = Date.now();
     try {
-      const tmp = join5(dir, "render.mov");
+      const tmp = join8(dir, "render.mov");
       const sec2 = (f) => (Math.max(0, f) / rate2).toFixed(6);
-      req.onProgress?.({ stage: "effectcraft", done: 0, total: frames3, message: req.comp });
+      req.onProgress?.({ stage: "effectcraft", done: 0, total: frames4, message: req.comp });
       const log = await cli(
         [
           "render",
@@ -30182,18 +30876,18 @@ ${await readFile5(runnerPath, "utf8")}`, "utf8");
           "--end",
           sec2(endFrame + 0.5)
         ],
-        Math.min(36e5, 3e5 + frames3 * 2e3),
+        Math.min(36e5, 3e5 + frames4 * 2e3),
         "render",
         req.signal
       );
-      if (!existsSync8(tmp)) throw new Error(`EffectCraft render wrote no file: ${log.trim().slice(-500)}`);
+      if (!existsSync10(tmp)) throw new Error(`EffectCraft render wrote no file: ${log.trim().slice(-500)}`);
       const out2 = uniqueOutputPath(resolve3(req.outPath));
       await moveFile(tmp, out2);
-      req.onProgress?.({ stage: "effectcraft", done: frames3, total: frames3, message: req.comp });
-      return { path: out2, frames: frames3, elapsedMs: Date.now() - t0, usedFallback: false, log: `EffectCraft ${fps} fps ProRes 422 HQ
+      req.onProgress?.({ stage: "effectcraft", done: frames4, total: frames4, message: req.comp });
+      return { path: out2, frames: frames4, elapsedMs: Date.now() - t0, usedFallback: false, log: `EffectCraft ${fps} fps ProRes 422 HQ
 ${log.trim()}` };
     } finally {
-      await rm4(dir, { recursive: true, force: true });
+      await rm5(dir, { recursive: true, force: true });
     }
   }
   async function previewFrame(aep, comp, frame2, outPng) {
@@ -30204,14 +30898,14 @@ ${log.trim()}` };
     if (frame2 >= durationFrames) throw new Error(`frame ${frame2} is past the end of ${comp} (${durationFrames} frames)`);
     const dir = await tempDir("catcut-ecp-");
     try {
-      const tmp = join5(dir, "frame.png");
+      const tmp = join8(dir, "frame.png");
       await cli(["render-frame", "--project", ecproj, "--comp", String(c3.id), "--frame", String(frame2), "--out", tmp], shortTimeout, "preview");
-      if (!existsSync8(tmp)) throw new Error("EffectCraft preview wrote no file");
+      if (!existsSync10(tmp)) throw new Error("EffectCraft preview wrote no file");
       const out2 = uniqueOutputPath(resolve3(outPng));
       await moveFile(tmp, out2);
       return out2;
     } finally {
-      await rm4(dir, { recursive: true, force: true });
+      await rm5(dir, { recursive: true, force: true });
     }
   }
   return {
@@ -30244,7 +30938,7 @@ ${log.trim()}` };
 function createMotionBackend(ae, ec) {
   const pick2 = (path12) => isEcProject(path12) ? ec : ae;
   const aeOnly = (what, path12) => {
-    if (isEcProject(path12)) throw new Error(`${what} is not available for EffectCraft projects yet (${basename4(path12)})`);
+    if (isEcProject(path12)) throw new Error(`${what} is not available for EffectCraft projects yet (${basename6(path12)})`);
   };
   const routed = {
     kind: ae.kind,
@@ -30280,6 +30974,7 @@ var init_effectcraft = __esm({
     init_execa();
     init_hash();
     init_aerender();
+    init_platform();
     TICKS_PER_SECOND = 254016e6;
     MARK = "@@CATCUT@@";
     isEcProject = (path12) => extname4(path12).toLowerCase() === ".ecproj";
@@ -30289,7 +30984,7 @@ var init_effectcraft = __esm({
 });
 
 // src/mcp/state.ts
-import os6 from "node:os";
+import os9 from "node:os";
 async function safeEnvironment() {
   try {
     return { env: await getEnvironment(), problems: [] };
@@ -30297,9 +30992,9 @@ async function safeEnvironment() {
     const env = {
       tools: { ffmpeg: "", ffprobe: "" },
       encoders: { h264_nvenc: false, h264_qsv: false, hevc_nvenc: false, libx264: false, prores_ks: false, dnxhd: false, mpeg2video: false },
-      totalRamGb: os6.totalmem() / 2 ** 30,
-      freeRamGb: os6.freemem() / 2 ** 30,
-      cpuThreads: os6.cpus().length
+      totalRamGb: os9.totalmem() / 2 ** 30,
+      freeRamGb: freeRamBytes() / 2 ** 30,
+      cpuThreads: os9.cpus().length
     };
     return { env, problems: [err2 instanceof Error ? err2.message : String(err2)] };
   }
@@ -30349,15 +31044,16 @@ var init_state = __esm({
   "src/mcp/state.ts"() {
     "use strict";
     init_tools();
+    init_platform();
   }
 });
 
 // src/review/session.ts
 import { randomUUID as randomUUID3 } from "node:crypto";
-import { mkdir as mkdir7, open as open2, readFile as readFile6, rename as rename6, rm as rm5, stat as stat4, writeFile as writeFile6 } from "node:fs/promises";
+import { mkdir as mkdir8, open as open2, readFile as readFile7, rename as rename7, rm as rm6, stat as stat4, writeFile as writeFile7 } from "node:fs/promises";
 import { hostname as hostname2 } from "node:os";
 import { setTimeout as delay } from "node:timers/promises";
-import { join as join6 } from "node:path";
+import { join as join9 } from "node:path";
 function withColors(n2) {
   return {
     ...n2,
@@ -30375,12 +31071,12 @@ function versionPlan(p, v) {
 }
 function sessionDir(p, v) {
   if (!/^v\d+$/.test(v.id)) throw new ReviewError("Invalid version id");
-  return join6(projectPaths(p).review, v.id);
+  return join9(projectPaths(p).review, v.id);
 }
 async function readReviewSession(p, v) {
-  const file = join6(sessionDir(p, v), "session.json");
+  const file = join9(sessionDir(p, v), "session.json");
   try {
-    const s = sessionSchema.parse(JSON.parse(await readFile6(file, "utf8")));
+    const s = sessionSchema.parse(JSON.parse(await readFile7(file, "utf8")));
     if (s.version !== v.id || s.planHash !== v.planHash) throw new ReviewError("Review belongs to a different build", 409);
     return s;
   } catch (error2) {
@@ -30399,13 +31095,13 @@ function serialize2(key, fn) {
   return result;
 }
 async function persist(dir, name, value) {
-  await mkdir7(dir, { recursive: true });
-  const tmp = join6(dir, `${name}-${randomUUID3()}.tmp`);
+  await mkdir8(dir, { recursive: true });
+  const tmp = join9(dir, `${name}-${randomUUID3()}.tmp`);
   try {
-    await writeFile6(tmp, JSON.stringify(value, null, 2) + "\n", { encoding: "utf8", flag: "wx" });
-    await rename6(tmp, join6(dir, `${name}.json`));
+    await writeFile7(tmp, JSON.stringify(value, null, 2) + "\n", { encoding: "utf8", flag: "wx" });
+    await rename7(tmp, join9(dir, `${name}.json`));
   } finally {
-    await rm5(tmp, { force: true });
+    await rm6(tmp, { force: true });
   }
 }
 function pidAlive2(pid) {
@@ -30419,7 +31115,7 @@ function pidAlive2(pid) {
 async function staleLock(lockPath) {
   let content, mtime;
   try {
-    [content, mtime] = await Promise.all([readFile6(lockPath, "utf8"), stat4(lockPath).then((s) => s.mtimeMs)]);
+    [content, mtime] = await Promise.all([readFile7(lockPath, "utf8"), stat4(lockPath).then((s) => s.mtimeMs)]);
   } catch {
     return void 0;
   }
@@ -30442,22 +31138,22 @@ async function staleLock(lockPath) {
 async function reclaim(lockPath, staleContent) {
   const aside = `${lockPath}.stale-${randomUUID3()}`;
   try {
-    await rename6(lockPath, aside);
+    await rename7(lockPath, aside);
   } catch {
     return;
   }
-  const moved = await readFile6(aside, "utf8").catch(() => staleContent);
+  const moved = await readFile7(aside, "utf8").catch(() => staleContent);
   if (moved !== staleContent) {
     try {
       await open2(lockPath, "wx").then((h2) => h2.writeFile(moved).finally(() => h2.close()));
     } catch {
     }
   }
-  await rm5(aside, { force: true });
+  await rm6(aside, { force: true });
 }
 async function locked(dir, fn) {
-  await mkdir7(dir, { recursive: true });
-  const lockPath = join6(dir, "session.lock");
+  await mkdir8(dir, { recursive: true });
+  const lockPath = join9(dir, "session.lock");
   const deadline = Date.now() + 2e3;
   const token = JSON.stringify({ pid: process.pid, host: hostname2(), at: Date.now(), id: randomUUID3() });
   let lock;
@@ -30481,7 +31177,7 @@ async function locked(dir, fn) {
     return await fn();
   } finally {
     await lock.close();
-    if (await readFile6(lockPath, "utf8").catch(() => void 0) === token) await rm5(lockPath, { force: true });
+    if (await readFile7(lockPath, "utf8").catch(() => void 0) === token) await rm6(lockPath, { force: true });
   }
 }
 function saveReviewSession(p, v, input) {
@@ -30542,17 +31238,17 @@ function submitReview(p, v, revision) {
     if (parsed.data.revision !== previous.revision) throw new ReviewError("Notes changed in another window. Reload before submitting.", 409);
     if (!previous.notes.length) throw new ReviewError("Add a note before submitting");
     const s = { ...previous, revision: previous.revision + 1, updatedAt: (/* @__PURE__ */ new Date()).toISOString(), status: "submitted" };
-    await mkdir7(dir, { recursive: true });
-    const file = join6(dir, `submitted-${randomUUID3()}.json`);
+    await mkdir8(dir, { recursive: true });
+    const file = join9(dir, `submitted-${randomUUID3()}.json`);
     const agent = agentReview(s);
-    await writeFile6(file, JSON.stringify({ ...s, ...agent }, null, 2) + "\n", { encoding: "utf8", flag: "wx" });
+    await writeFile7(file, JSON.stringify({ ...s, ...agent }, null, 2) + "\n", { encoding: "utf8", flag: "wx" });
     await persist(dir, "session", s);
     return { session: s, path: file, ...agent };
   }));
 }
 async function readReviewDraft(p, v) {
   try {
-    const d = storedDraft.parse(JSON.parse(await readFile6(join6(sessionDir(p, v), "draft.json"), "utf8")));
+    const d = storedDraft.parse(JSON.parse(await readFile7(join9(sessionDir(p, v), "draft.json"), "utf8")));
     return d.version === v.id && d.planHash === v.planHash ? d : null;
   } catch {
     return null;
@@ -30569,7 +31265,7 @@ function saveReviewDraft(p, v, input) {
   const dir = sessionDir(p, v);
   return serialize2(`${dir}#draft`, async () => {
     if (!d) {
-      await rm5(join6(dir, "draft.json"), { force: true });
+      await rm6(join9(dir, "draft.json"), { force: true });
       return null;
     }
     const stored = { ...d, version: v.id, planHash: v.planHash, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
@@ -30653,10 +31349,10 @@ var init_session = __esm({
 });
 
 // src/review/compare.ts
-import { existsSync as existsSync9 } from "node:fs";
-import { mkdir as mkdir8, mkdtemp as mkdtemp3, readdir as readdir3, realpath, rm as rm6, writeFile as writeFile7 } from "node:fs/promises";
-import os7 from "node:os";
-import { basename as basename5, dirname as dirname5, extname as extname5, isAbsolute, join as join7, relative } from "node:path";
+import { existsSync as existsSync11 } from "node:fs";
+import { mkdir as mkdir9, mkdtemp as mkdtemp5, readdir as readdir3, realpath, rm as rm7, writeFile as writeFile8 } from "node:fs/promises";
+import os10 from "node:os";
+import { basename as basename7, dirname as dirname6, extname as extname5, isAbsolute, join as join10, relative } from "node:path";
 function mapFrames(from, to, labels = { from: "A", to: "B" }) {
   const last = Math.max(0, to.frames - 1);
   if (from.frames === to.frames) return { method: "timecode", segments: [{ start: 0, dur: from.frames, toStart: 0, toMin: 0, toMax: last }] };
@@ -30711,9 +31407,9 @@ async function findComparable(p, current, id) {
 function comparePairs(a2, b, opts = {}, max = 24) {
   const map = mapFrames(a2, b);
   const shotAt = (f) => a2.shots.find((s) => f >= s.start && f < s.start + s.dur);
-  let frames3;
+  let frames4;
   if (opts.frames?.length) {
-    frames3 = opts.frames.map((f) => {
+    frames4 = opts.frames.map((f) => {
       if (!Number.isInteger(f) || f < 0 || f >= a2.frames) throw new ReviewError(`frame ${f} is outside version A (0\u2013${a2.frames - 1})`);
       const s = shotAt(f);
       return { f, ...s ? { clipId: s.id } : {} };
@@ -30724,31 +31420,31 @@ function comparePairs(a2, b, opts = {}, max = 24) {
       if (!s) throw new ReviewError(`clip ${id} is not in version A`);
       return s;
     }) : a2.shots.filter((s) => s.dur > 0);
-    frames3 = shots.map((s) => ({ f: s.start + Math.floor(s.dur / 2), clipId: s.id }));
+    frames4 = shots.map((s) => ({ f: s.start + Math.floor(s.dur / 2), clipId: s.id }));
   }
-  if (!frames3.length) throw new ReviewError("Nothing to compare");
-  if (frames3.length > max) throw new ReviewError(`At most ${max} pairs per sheet; pass clipIds or frames`);
-  return { pairs: frames3.map(({ f, clipId }) => ({ ...clipId ? { clipId } : {}, a: f, b: mapFrame(map, f) })), map };
+  if (!frames4.length) throw new ReviewError("Nothing to compare");
+  if (frames4.length > max) throw new ReviewError(`At most ${max} pairs per sheet; pass clipIds or frames`);
+  return { pairs: frames4.map(({ f, clipId }) => ({ ...clipId ? { clipId } : {}, a: f, b: mapFrame(map, f) })), map };
 }
 async function run3(file, args, timeoutMs, signal) {
   const r = await execa(file, args, { reject: false, windowsHide: true, stdin: "ignore", timeout: timeoutMs, cancelSignal: signal, forceKillAfterDelay: 2e3, maxBuffer: 16 * 2 ** 20 });
   if (r.isCanceled) throw new Error("compare sheet cancelled");
-  if (r.timedOut) throw new Error(`compare sheet: ${basename5(file)} timed out after ${timeoutMs} ms`);
+  if (r.timedOut) throw new Error(`compare sheet: ${basename7(file)} timed out after ${timeoutMs} ms`);
   return { exitCode: r.exitCode ?? -1, stderr: String(r.stderr ?? "") };
 }
 function freePath(p) {
-  const ext = extname5(p), stem = join7(dirname5(p), basename5(p, ext));
-  const free = (c3) => !existsSync9(c3) && !existsSync9(c3.slice(0, -ext.length) + ".json");
+  const ext = extname5(p), stem = join10(dirname6(p), basename7(p, ext));
+  const free = (c3) => !existsSync11(c3) && !existsSync11(c3.slice(0, -ext.length) + ".json");
   if (free(p)) return p;
   for (let i2 = 2; i2 < 1e4; i2++) if (free(`${stem}_${i2}${ext}`)) return `${stem}_${i2}${ext}`;
   throw new Error(`cannot find a free name next to ${p}`);
 }
-async function grab(tools, side, frames3, dir, height, timeoutMs, signal) {
-  const select = frames3.map((f) => `eq(n\\,${f})`).join("+");
+async function grab(tools, side, frames4, dir, height, timeoutMs, signal) {
+  const select = frames4.map((f) => `eq(n\\,${f})`).join("+");
   const vf = `select='${select}',scale=${THUMB_W}:${height}:force_original_aspect_ratio=decrease,pad=${THUMB_W}:${height}:(ow-iw)/2:(oh-ih)/2:color=0x101010,setsar=1`;
-  const r = await run3(tools.ffmpeg, ["-hide_banner", "-nostats", "-nostdin", "-n", "-i", side.media, "-map", "0:v:0", "-vf", vf, "-fps_mode", "passthrough", "-frames:v", String(frames3.length), join7(dir, "f%04d.png")], timeoutMs, signal);
-  const files = (await readdir3(dir)).filter((f) => /^f\d{4}\.png$/.test(f)).sort().map((f) => join7(dir, f));
-  if (r.exitCode !== 0 || files.length !== frames3.length) throw new Error(`could not read frames from ${side.id}: ${r.stderr.trim().split(/\r?\n/).slice(-3).join(" ")}`);
+  const r = await run3(tools.ffmpeg, ["-hide_banner", "-nostats", "-nostdin", "-n", "-i", side.media, "-map", "0:v:0", "-vf", vf, "-fps_mode", "passthrough", "-frames:v", String(frames4.length), join10(dir, "f%04d.png")], timeoutMs, signal);
+  const files = (await readdir3(dir)).filter((f) => /^f\d{4}\.png$/.test(f)).sort().map((f) => join10(dir, f));
+  if (r.exitCode !== 0 || files.length !== frames4.length) throw new Error(`could not read frames from ${side.id}: ${r.stderr.trim().split(/\r?\n/).slice(-3).join(" ")}`);
   return files;
 }
 async function renderCompareSheet(opts) {
@@ -30757,23 +31453,24 @@ async function renderCompareSheet(opts) {
   if (!pairs.length) throw new Error("no frames to compare");
   const timeoutMs = opts.timeoutMs ?? 10 * 6e4;
   const height = Math.max(2, Math.round(THUMB_W * a2.plan.height / a2.plan.width / 2) * 2);
-  const tmp = await mkdtemp3(join7(os7.tmpdir(), "editmcp-compare-"));
+  const tmp = await mkdtemp5(join10(os10.tmpdir(), "editmcp-compare-"));
   try {
     const files = /* @__PURE__ */ new Map();
     for (const [key, side, list] of [["a", a2, pairs.map((x) => x.a)], ["b", b, pairs.map((x) => x.b)]]) {
       const unique = [...new Set(list)].sort((x, y) => x - y);
-      const dir = join7(tmp, key);
-      await mkdir8(dir);
+      const dir = join10(tmp, key);
+      await mkdir9(dir);
       const grabbed = await grab(tools, side, unique, dir, height, timeoutMs, opts.signal);
       unique.forEach((f, i2) => files.set(`${key}${f}`, grabbed[i2]));
     }
     const target = freePath(opts.outPath);
-    await mkdir8(dirname5(target), { recursive: true });
+    await mkdir9(dirname6(target), { recursive: true });
     const inputs = pairs.flatMap((x) => ["-i", files.get(`a${x.a}`), "-i", files.get(`b${x.b}`)]);
     const tc = (f) => framesToTc(f, a2.plan.fps).replace(/:/g, "\\:");
     const label = (font, text2) => `,drawtext=${font}:fontsize=18:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=4:x=8:y=8:text='${text2}'`;
     const fonts = [];
-    if (existsSync9(WINDOWS_FONT2)) fonts.push(`fontfile='${WINDOWS_FONT2.replace(":", "\\:")}'`);
+    const labelFont = labelFontOpt();
+    if (labelFont) fonts.push(labelFont);
     fonts.push("font=Sans", void 0);
     let lastErr = "";
     for (const font of fonts) {
@@ -30786,7 +31483,7 @@ async function renderCompareSheet(opts) {
       const rows = pairs.map((_, i2) => `[r${i2}]`).join("");
       graph.push(pairs.length > 1 ? `${rows}vstack=inputs=${pairs.length}[out]` : `${rows}null[out]`);
       const r = await run3(tools.ffmpeg, ["-hide_banner", "-nostats", "-nostdin", "-n", ...inputs, "-filter_complex", graph.join(";"), "-map", "[out]", "-frames:v", "1", "-update", "1", target], timeoutMs, opts.signal);
-      if (r.exitCode === 0 && existsSync9(target)) {
+      if (r.exitCode === 0 && existsSync11(target)) {
         const result = {
           path: target,
           sidecar: target.slice(0, -extname5(target).length) + ".json",
@@ -30795,31 +31492,31 @@ async function renderCompareSheet(opts) {
           ...opts.map.warning ? { warning: opts.map.warning } : {},
           pairs: pairs.map((x) => ({ ...x.clipId ? { clipId: x.clipId } : {}, a: { version: a2.id, frame: x.a, tc: framesToTc(x.a, a2.plan.fps) }, b: { version: b.id, frame: x.b, tc: framesToTc(x.b, b.plan.fps) } }))
         };
-        await writeFile7(result.sidecar, JSON.stringify({ versionA: a2.id, versionB: b.id, ...result }, null, 2) + "\n", { encoding: "utf8", flag: "wx" });
+        await writeFile8(result.sidecar, JSON.stringify({ versionA: a2.id, versionB: b.id, ...result }, null, 2) + "\n", { encoding: "utf8", flag: "wx" });
         return result;
       }
       lastErr = r.stderr.trim().split(/\r?\n/).slice(-3).join(" ");
     }
     throw new Error(`compare sheet failed: ${lastErr}`);
   } finally {
-    await rm6(tmp, { recursive: true, force: true });
+    await rm7(tmp, { recursive: true, force: true });
   }
 }
 function sheetMedia(v) {
-  if (v.master && existsSync9(v.master)) return v.master;
-  if (v.reviewProxy && existsSync9(v.reviewProxy)) return v.reviewProxy;
+  if (v.master && existsSync11(v.master)) return v.master;
+  if (v.reviewProxy && existsSync11(v.reviewProxy)) return v.reviewProxy;
   throw new ReviewError(`${v.id} has no master or review proxy on disk`);
 }
-var clamp, THUMB_W, WINDOWS_FONT2, safeLabel;
+var clamp, THUMB_W, safeLabel;
 var init_compare = __esm({
   "src/review/compare.ts"() {
     "use strict";
     init_execa();
+    init_platform();
     init_timecode();
     init_session();
     clamp = (n2, lo, hi) => Math.max(lo, Math.min(hi, n2));
     THUMB_W = 480;
-    WINDOWS_FONT2 = "C:/Windows/Fonts/arial.ttf";
     safeLabel = (s) => s.replace(/[^A-Za-z0-9_.-]/g, "").slice(0, 24);
   }
 });
@@ -30827,8 +31524,8 @@ var init_compare = __esm({
 // src/review/server.ts
 import { randomBytes as randomBytes5 } from "node:crypto";
 import { createReadStream as createReadStream2 } from "node:fs";
-import { existsSync as existsSync10 } from "node:fs";
-import { readFile as readFile7, stat as stat5 } from "node:fs/promises";
+import { existsSync as existsSync12 } from "node:fs";
+import { readFile as readFile8, stat as stat5 } from "node:fs/promises";
 import { createServer } from "node:http";
 async function body(req) {
   if (req.headers["content-type"]?.split(";")[0] !== "application/json") throw new ReviewError("Expected JSON");
@@ -30903,9 +31600,9 @@ async function openReview(p, v) {
     ["app.js", "app.js", "text/javascript"],
     ["style.css", "style.css", "text/css"],
     ["fonts/NotoSansThai.ttf", "fonts/NotoSansThai.ttf", "font/ttf"]
-  ]) assets.set(route, { body: await readFile7(new URL(`../../web/review/${file}`, import.meta.url)), type });
+  ]) assets.set(route, { body: await readFile8(new URL(`../../web/review/${file}`, import.meta.url)), type });
   const logo = new URL("../../web/review/logo.svg", import.meta.url);
-  if (existsSync10(logo)) assets.set("logo.svg", { body: await readFile7(logo), type: "image/svg+xml" });
+  if (existsSync12(logo)) assets.set("logo.svg", { body: await readFile8(logo), type: "image/svg+xml" });
   let origin = "";
   const server = createServer((req, res) => {
     res.setHeader("Cache-Control", "no-store");
@@ -30956,7 +31653,7 @@ async function openReview(p, v) {
       }
       if (route === "contact" && v.qc?.contactSheet) {
         res.writeHead(200, { "Content-Type": "image/png" });
-        return res.end(await readFile7(v.qc.contactSheet));
+        return res.end(await readFile8(v.qc.contactSheet));
       }
       const asset = assets.get(route);
       if (!asset) throw new ReviewError("Not found", 404);
@@ -31031,7 +31728,7 @@ var init_tooldef = __esm({
 
 // src/io/board.ts
 import { createHash as createHash2 } from "node:crypto";
-import { readdir as readdir4, readFile as readFile8, stat as stat6 } from "node:fs/promises";
+import { readdir as readdir4, readFile as readFile9, stat as stat6 } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path10 from "node:path";
 function parseBoardTime(input, fps) {
@@ -31060,14 +31757,14 @@ function parseBoardTime(input, fps) {
 }
 function normalizeBoard(input, fps, source2) {
   const errors = [];
-  const pick2 = (frames3, str, what) => {
-    if (str === void 0 || str.trim() === "") return frames3;
+  const pick2 = (frames4, str, what) => {
+    if (str === void 0 || str.trim() === "") return frames4;
     const f = parseBoardTime(str, fps);
     if (f === void 0) {
       errors.push(`${what}: \u0E2D\u0E48\u0E32\u0E19\u0E40\u0E27\u0E25\u0E32 "${str}" \u0E44\u0E21\u0E48\u0E44\u0E14\u0E49 / unreadable time`);
-      return frames3;
+      return frames4;
     }
-    if (frames3 !== void 0 && frames3 !== f) errors.push(`${what}: \u0E04\u0E48\u0E32\u0E40\u0E1F\u0E23\u0E21 ${frames3} \u0E02\u0E31\u0E14\u0E01\u0E31\u0E1A "${str}" (= ${f}) / frames and time string disagree`);
+    if (frames4 !== void 0 && frames4 !== f) errors.push(`${what}: \u0E04\u0E48\u0E32\u0E40\u0E1F\u0E23\u0E21 ${frames4} \u0E02\u0E31\u0E14\u0E01\u0E31\u0E1A "${str}" (= ${f}) / frames and time string disagree`);
     return f;
   };
   const slots = input.slots.map((s, i2) => {
@@ -31443,7 +32140,7 @@ async function importBoardFile(file, fps, opts = {}) {
   const abs = path10.resolve(file);
   const st = await stat6(abs).catch(() => void 0);
   if (!st?.isFile()) throw new Error(`\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E44\u0E1F\u0E25\u0E4C / file not found: ${abs}`);
-  const buf = await readFile8(abs);
+  const buf = await readFile9(abs);
   const info = {
     path: abs,
     name: path10.basename(abs),
@@ -32141,15 +32838,15 @@ var init_board = __esm({
 });
 
 // src/mcp/tools-board.ts
-import { existsSync as existsSync11 } from "node:fs";
-import { mkdir as mkdir9, readFile as readFile9, rename as rename7, rm as rm7, writeFile as writeFile8 } from "node:fs/promises";
-import { basename as basename6, extname as extname6, join as join8, resolve as resolve4 } from "node:path";
+import { existsSync as existsSync13 } from "node:fs";
+import { mkdir as mkdir10, readFile as readFile10, rename as rename8, rm as rm8, writeFile as writeFile9 } from "node:fs/promises";
+import { basename as basename8, extname as extname6, join as join11, resolve as resolve4 } from "node:path";
 import { randomBytes as randomBytes6 } from "node:crypto";
 async function readBoardFile(p) {
-  const file = join8(p.dir, BOARD_FILE);
-  if (!existsSync11(file)) return void 0;
+  const file = join11(p.dir, BOARD_FILE);
+  if (!existsSync13(file)) return void 0;
   try {
-    const d = JSON.parse(await readFile9(file, "utf8"));
+    const d = JSON.parse(await readFile10(file, "utf8"));
     return d.board && Array.isArray(d.board.slots) ? d : void 0;
   } catch {
     return void 0;
@@ -32167,15 +32864,15 @@ async function requireBoard(p) {
   return b;
 }
 async function writeHistory(p, prefix, body2) {
-  const dir = join8(p.dir, "history");
-  await mkdir9(dir, { recursive: true });
+  const dir = join11(p.dir, "history");
+  await mkdir10(dir, { recursive: true });
   const stamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
   const text2 = `${JSON.stringify(body2, null, 2)}
 `;
   for (let n2 = 1; ; n2++) {
-    const file = join8(dir, `${prefix}-${stamp}-${n2}.json`);
+    const file = join11(dir, `${prefix}-${stamp}-${n2}.json`);
     try {
-      await writeFile8(file, text2, { encoding: "utf8", flag: "wx" });
+      await writeFile9(file, text2, { encoding: "utf8", flag: "wx" });
       return file;
     } catch (e) {
       if (e.code !== "EEXIST") throw e;
@@ -32191,14 +32888,14 @@ async function storeBoard(state, p, board, reason, src) {
   const body2 = { schema: 1, savedAt: (/* @__PURE__ */ new Date()).toISOString(), reason, board };
   if (src?.sha256) body2.sourceSha256 = src.sha256;
   if (src?.modified) body2.sourceModified = src.modified;
-  const file = join8(p.dir, BOARD_FILE);
-  const tmp = join8(p.dir, `.${BOARD_FILE}.${process.pid}.${randomBytes6(4).toString("hex")}.tmp`);
-  await writeFile8(tmp, `${JSON.stringify(body2, null, 2)}
+  const file = join11(p.dir, BOARD_FILE);
+  const tmp = join11(p.dir, `.${BOARD_FILE}.${process.pid}.${randomBytes6(4).toString("hex")}.tmp`);
+  await writeFile9(tmp, `${JSON.stringify(body2, null, 2)}
 `, "utf8");
   try {
-    await rename7(tmp, file);
+    await rename8(tmp, file);
   } catch (e) {
-    await rm7(tmp, { force: true });
+    await rm8(tmp, { force: true });
     throw e;
   }
   p.board = board;
@@ -32224,7 +32921,7 @@ function resolveShots(p, board, shots) {
   const out2 = shots.map((s) => {
     const sh = { id: s.id, src: s.src, start: s.start, dur: s.dur };
     const asset = p.assets[s.src];
-    if (asset && asset.kind !== "aecomp") sh.file = basename6(asset.path);
+    if (asset && asset.kind !== "aecomp") sh.file = basename8(asset.path);
     if (s.marker) sh.marker = s.marker;
     if (s.slot) {
       sh.slot = s.slot;
@@ -32266,14 +32963,14 @@ async function grabFrame(state, master, frame2, fps, out2, signal) {
     "-n",
     out2
   ], { windowsHide: true, timeout: 6e4, forceKillAfterDelay: 3e3, reject: false, stdin: "ignore", cancelSignal: signal });
-  return r.exitCode === 0 && existsSync11(out2);
+  return r.exitCode === 0 && existsSync13(out2);
 }
 async function uniqueDir(base) {
   for (let n2 = 1; ; n2++) {
     const d = n2 === 1 ? base : `${base}_${n2}`;
-    if (existsSync11(d)) continue;
+    if (existsSync13(d)) continue;
     try {
-      await mkdir9(d);
+      await mkdir10(d);
       return d;
     } catch (e) {
       if (e.code !== "EEXIST") throw e;
@@ -32286,7 +32983,7 @@ async function writeUnique(base, text2) {
   for (let n2 = 1; ; n2++) {
     const file = n2 === 1 ? base : `${stem}_${n2}${ext}`;
     try {
-      await writeFile8(file, text2, { encoding: "utf8", flag: "wx" });
+      await writeFile9(file, text2, { encoding: "utf8", flag: "wx" });
       return file;
     } catch (e) {
       if (e.code !== "EEXIST") throw e;
@@ -32538,29 +33235,29 @@ var init_tools_board = __esm({
           const wantFrames = a2.frames ?? true;
           if (wantFrames) requireFfmpeg(state);
           return runJob(state, "board_vs_cut", async (ctx) => {
-            const outDir = join8(state.api.project.projectPaths(p).out, v.id);
-            await mkdir9(outDir, { recursive: true });
+            const outDir = join11(state.api.project.projectPaths(p).out, v.id);
+            await mkdir10(outDir, { recursive: true });
             const notes = [];
             if (how["marker"] || how["source"]) notes.push(`slot \u0E02\u0E2D\u0E07 ${how["marker"] + how["source"]} \u0E04\u0E25\u0E34\u0E1B\u0E40\u0E14\u0E32\u0E08\u0E32\u0E01 marker/\u0E0A\u0E37\u0E48\u0E2D\u0E44\u0E1F\u0E25\u0E4C \u2014 \u0E22\u0E37\u0E19\u0E22\u0E31\u0E19\u0E14\u0E49\u0E27\u0E22 board_link / ${how["marker"] + how["source"]} slot(s) inferred`);
             if (how["timeline"]) notes.push(`slot \u0E02\u0E2D\u0E07 ${how["timeline"]} \u0E04\u0E25\u0E34\u0E1B\u0E21\u0E32\u0E08\u0E32\u0E01\u0E44\u0E17\u0E21\u0E4C\u0E44\u0E25\u0E19\u0E4C\u0E1B\u0E31\u0E08\u0E08\u0E38\u0E1A\u0E31\u0E19 (\u0E40\u0E27\u0E2D\u0E23\u0E4C\u0E0A\u0E31\u0E19\u0E19\u0E35\u0E49 build \u0E01\u0E48\u0E2D\u0E19\u0E1C\u0E39\u0E01 slot) / taken from the live timeline`);
             const images = /* @__PURE__ */ new Map();
             const master = v.master;
-            const masterOk = !!master && existsSync11(master);
+            const masterOk = !!master && existsSync13(master);
             let imgDir;
             if (wantFrames && !masterOk) notes.push(`\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E44\u0E1F\u0E25\u0E4C master ${master ?? ""} \u2014 \u0E44\u0E21\u0E48\u0E21\u0E35\u0E40\u0E1F\u0E23\u0E21\u0E08\u0E32\u0E01\u0E04\u0E31\u0E17 / master not found`);
             const cutAfter = new Map((plan.cuts ?? []).filter((c3) => c3.dissolve > 0).map((c3) => [c3.after, c3.dissolve]));
             const realised = cmp.slots.filter((s) => s.cutStart !== void 0);
-            if (wantFrames && masterOk && realised.length) imgDir = await uniqueDir(join8(outDir, "board_vs_cut_frames"));
+            if (wantFrames && masterOk && realised.length) imgDir = await uniqueDir(join11(outDir, "board_vs_cut_frames"));
             let done = 0;
             for (const s of cmp.slots) {
               const img = {};
-              if (s.thumb && existsSync11(s.thumb)) img.board = htmlHref(s.thumb, outDir);
+              if (s.thumb && existsSync13(s.thumb)) img.board = htmlHref(s.thumb, outDir);
               if (imgDir && s.cutStart !== void 0) {
                 const idx = plan.shots.findIndex((x) => x.id === s.clips[0]);
                 const prevId = idx > 0 ? plan.shots[idx - 1].id : void 0;
                 const inB = prevId && cutAfter.has(prevId) ? splitDissolve(cutAfter.get(prevId)).b : 0;
                 const frame2 = s.cutStart + Math.min(Math.max(0, (s.cutDur ?? 1) - 1), inB + 2);
-                const file = join8(imgDir, `${String(done + 1).padStart(3, "0")}_${s.slot.replace(/[^A-Za-z0-9_-]/g, "_")}.jpg`);
+                const file = join11(imgDir, `${String(done + 1).padStart(3, "0")}_${s.slot.replace(/[^A-Za-z0-9_-]/g, "_")}.jpg`);
                 if (await grabFrame(state, master, frame2, fps, file, ctx.signal)) {
                   img.cut = htmlHref(file, outDir);
                   img.cutFrame = frame2;
@@ -32570,8 +33267,8 @@ var init_tools_board = __esm({
               }
               images.set(s.slot, img);
             }
-            const html = renderBoardVsCutHtml(cmp, { title: `${p.meta.name} \xB7 ${basename6(board.source)}`, version: v.id, ...masterOk ? { master } : {}, images, notes });
-            const report2 = await writeUnique(join8(outDir, "board_vs_cut.html"), html);
+            const html = renderBoardVsCutHtml(cmp, { title: `${p.meta.name} \xB7 ${basename8(board.source)}`, version: v.id, ...masterOk ? { master } : {}, images, notes });
+            const report2 = await writeUnique(join11(outDir, "board_vs_cut.html"), html);
             return {
               ok: !cmp.issues.some((i2) => i2.severity === "error"),
               version: v.id,
@@ -32656,9 +33353,9 @@ var init_tools_board = __esm({
 });
 
 // src/engine/scan.ts
-import { constants as constants8, existsSync as existsSync12 } from "node:fs";
-import { copyFile as copyFile5, link as link3, mkdir as mkdir10, readdir as readdir5, rename as rename8, readFile as readFile10, stat as stat7, writeFile as writeFile9 } from "node:fs/promises";
-import { basename as basename7, dirname as dirname6, extname as extname7, join as join9, relative as relative2, sep as sep2 } from "node:path";
+import { constants as constants8, existsSync as existsSync14 } from "node:fs";
+import { copyFile as copyFile5, link as link3, mkdir as mkdir11, readdir as readdir5, rename as rename9, readFile as readFile11, stat as stat7, writeFile as writeFile10 } from "node:fs/promises";
+import { basename as basename9, dirname as dirname7, extname as extname7, join as join12, relative as relative2, sep as sep2 } from "node:path";
 function encodeWith(s, rev) {
   const bytes = [];
   for (const ch of s) {
@@ -32817,7 +33514,7 @@ async function listFiles(dir, recursive) {
   const walk3 = async (d) => {
     const entries = await readdir5(d, { withFileTypes: true });
     for (const e of entries) {
-      const full = join9(d, e.name);
+      const full = join12(d, e.name);
       if (e.isDirectory()) {
         if (recursive && !e.name.startsWith(".")) await walk3(full);
         continue;
@@ -32867,14 +33564,14 @@ async function scanFootage(tools, dir, opts = {}) {
   await pool(paths, Math.max(1, opts.concurrency ?? 4), async (path12, i2) => {
     const rel = relative2(dir, path12);
     const kind = kindOf(path12);
-    const f = { path: path12, rel, name: basename7(path12), kind, size: (await stat7(path12)).size, flags: [], notes: [] };
+    const f = { path: path12, rel, name: basename9(path12), kind, size: (await stat7(path12)).size, flags: [], notes: [] };
     const fixedRel = fixRel(rel);
     if (fixedRel) {
       f.fixedRel = fixedRel;
       f.flags.push("mojibake");
     }
-    const name = basename7(fixedRel ?? rel);
-    f.slot = slotOf(name) ?? slotOf(basename7(dirname6(fixedRel ?? rel)));
+    const name = basename9(fixedRel ?? rel);
+    f.slot = slotOf(name) ?? slotOf(basename9(dirname7(fixedRel ?? rel)));
     if (f.slot === void 0) delete f.slot;
     if (kind !== "audio") {
       const p = await probeFile(tools, path12, opts.signal);
@@ -32933,16 +33630,16 @@ function conforms(src, project2) {
   return Math.abs(ratio - Math.round(ratio)) < 2e-3 && Math.round(ratio) >= 1;
 }
 async function applyAliases(report2, aliasDir) {
-  await mkdir10(aliasDir, { recursive: true });
-  const res = { aliasDir, created: [], skipped: [], index: join9(aliasDir, "aliases.json") };
+  await mkdir11(aliasDir, { recursive: true });
+  const res = { aliasDir, created: [], skipped: [], index: join12(aliasDir, "aliases.json") };
   for (const f of report2.files) {
     if (!f.fixedRel) continue;
-    const alias = join9(aliasDir, f.fixedRel);
-    if (existsSync12(alias)) {
+    const alias = join12(aliasDir, f.fixedRel);
+    if (existsSync14(alias)) {
       res.skipped.push({ source: f.path, alias, reason: "exists" });
       continue;
     }
-    await mkdir10(dirname6(alias), { recursive: true });
+    await mkdir11(dirname7(alias), { recursive: true });
     try {
       await link3(f.path, alias);
       res.created.push({ source: f.path, alias, method: "hardlink" });
@@ -32961,17 +33658,17 @@ async function applyAliases(report2, aliasDir) {
     }
   }
   let index = {};
-  if (existsSync12(res.index)) {
+  if (existsSync14(res.index)) {
     try {
-      index = JSON.parse(await readFile10(res.index, "utf8"));
+      index = JSON.parse(await readFile11(res.index, "utf8"));
     } catch {
     }
   }
   for (const c3 of res.created) index[c3.alias] = c3.source;
   const tmp = `${res.index}.${process.pid}.${Date.now()}.tmp`;
-  await writeFile9(tmp, `${JSON.stringify(index, null, 2)}
+  await writeFile10(tmp, `${JSON.stringify(index, null, 2)}
 `, { encoding: "utf8", flag: "wx" });
-  await rename8(tmp, res.index);
+  await rename9(tmp, res.index);
   return res;
 }
 var VIDEO_EXT, AUDIO_EXT2, STILL_EXT2, COMMON_FPS, CP437_HIGH, CP1252_80, REV_CP437, REV_CP1252, THAI, utf8, THAI_MARK, THAI_BASE;
@@ -32997,9 +33694,9 @@ var init_scan = __esm({
 });
 
 // src/engine/shots.ts
-import { existsSync as existsSync13 } from "node:fs";
-import { mkdir as mkdir11, readFile as readFile11, rename as rename9, writeFile as writeFile10 } from "node:fs/promises";
-import { basename as basename8, join as join10 } from "node:path";
+import { existsSync as existsSync15 } from "node:fs";
+import { mkdir as mkdir12, readFile as readFile12, rename as rename10, writeFile as writeFile11 } from "node:fs/promises";
+import { basename as basename10, join as join13 } from "node:path";
 async function run5(file, args, timeoutMs, signal) {
   const r = await execa(file, args, {
     reject: false,
@@ -33011,7 +33708,7 @@ async function run5(file, args, timeoutMs, signal) {
     maxBuffer: 512 * 2 ** 20
   });
   if (r.isCanceled) throw new Error("shot detection cancelled");
-  if (r.timedOut) throw new Error(`${basename8(file)} timed out after ${timeoutMs} ms`);
+  if (r.timedOut) throw new Error(`${basename10(file)} timed out after ${timeoutMs} ms`);
   return { exitCode: r.exitCode ?? -1, stdout: String(r.stdout ?? ""), stderr: String(r.stderr ?? "") };
 }
 function ffmpegVersion(tools) {
@@ -33049,22 +33746,22 @@ function buildIndex(recs, fps, base) {
   const t0 = recs.length ? Math.min(...recs.slice(0, 8).map((r) => r.t)) : 0;
   const pos = (t) => Math.max(0, Math.round((t - t0) * fps));
   const last = recs.length ? pos(recs[recs.length - 1].t) : -1;
-  const frames3 = last + 1;
-  const motion = new Array(Math.max(0, frames3)).fill(void 0);
+  const frames4 = last + 1;
+  const motion = new Array(Math.max(0, frames4)).fill(void 0);
   const cutSet = /* @__PURE__ */ new Set();
   for (const r of recs) {
     const f = pos(r.t);
-    if (f >= frames3) continue;
+    if (f >= frames4) continue;
     motion[f] = r.mafd;
     if (r.cut && f > 0) cutSet.add(f);
   }
   let prev = 0;
   const filled = motion.map((v) => prev = v ?? prev);
   const cuts = [...cutSet].sort((a2, b) => a2 - b);
-  return { ...base, fps, frames: frames3, cuts, shots: shotsFrom(cuts, frames3, filled), motion: filled };
+  return { ...base, fps, frames: frames4, cuts, shots: shotsFrom(cuts, frames4, filled), motion: filled };
 }
-function shotsFrom(cuts, frames3, motion) {
-  const bounds = [0, ...cuts, frames3];
+function shotsFrom(cuts, frames4, motion) {
+  const bounds = [0, ...cuts, frames4];
   const shots = [];
   for (let i2 = 0; i2 + 1 < bounds.length; i2++) {
     const start = bounds[i2];
@@ -33102,12 +33799,12 @@ function sameKey(e, threshold, ver, fps) {
   return e.threshold === threshold && e.ffmpegVersion === ver && Math.abs(e.fps - fps) < 1e-6;
 }
 function shotCachePath(cacheDir, fileHash) {
-  return join10(cacheDir, `${fileHash}.json`);
+  return join13(cacheDir, `${fileHash}.json`);
 }
 async function readCache(file) {
-  if (!existsSync13(file)) return void 0;
+  if (!existsSync15(file)) return void 0;
   try {
-    const j = JSON.parse(await readFile11(file, "utf8"));
+    const j = JSON.parse(await readFile12(file, "utf8"));
     return Array.isArray(j.entries) ? j : void 0;
   } catch {
     return void 0;
@@ -33122,7 +33819,7 @@ async function loadCachedShots(cacheDir, fileHash, opts) {
   return { ...rest, motion: decodeMotion(motionQ) };
 }
 async function writeCache(cacheDir, idx) {
-  await mkdir11(cacheDir, { recursive: true });
+  await mkdir12(cacheDir, { recursive: true });
   const file = shotCachePath(cacheDir, idx.fileHash);
   const prev = await readCache(file);
   const { motion, ...rest } = idx;
@@ -33130,9 +33827,9 @@ async function writeCache(cacheDir, idx) {
   const entries = (prev?.entries ?? []).filter((x) => !(x.schema === CACHE_SCHEMA && sameKey(x, idx.threshold, idx.ffmpegVersion, idx.fps)));
   entries.push(entry);
   const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
-  await writeFile10(tmp, `${JSON.stringify({ fileHash: idx.fileHash, entries })}
+  await writeFile11(tmp, `${JSON.stringify({ fileHash: idx.fileHash, entries })}
 `, { encoding: "utf8", flag: "wx" });
-  await rename9(tmp, file);
+  await rename10(tmp, file);
 }
 async function detectShots(tools, path12, opts) {
   const threshold = opts.threshold ?? DEFAULT_SCENE_THRESHOLD;
@@ -33494,15 +34191,15 @@ __export(proxy_exports, {
   makeProxies: () => makeProxies,
   planProxies: () => planProxies
 });
-import { existsSync as existsSync14 } from "node:fs";
-import { mkdir as mkdir12, readdir as readdir6, rename as rename10, rm as rm8, stat as stat8, statfs } from "node:fs/promises";
-import { basename as basename9, dirname as dirname7, extname as extname8, join as join11, parse as parse4, relative as relative3, resolve as resolve5 } from "node:path";
+import { existsSync as existsSync16 } from "node:fs";
+import { mkdir as mkdir13, readdir as readdir6, rename as rename11, rm as rm9, stat as stat8, statfs } from "node:fs/promises";
+import { basename as basename11, dirname as dirname8, extname as extname8, join as join14, parse as parse4, relative as relative3, resolve as resolve5 } from "node:path";
 async function planProxies(sources, proxyDir) {
   const out2 = [];
   const seen = /* @__PURE__ */ new Set();
   const add = (file, root) => {
-    const rel = relative3(root, dirname7(file));
-    const target = join11(resolve5(proxyDir), basename9(root), rel, `${basename9(file, extname8(file))}_Proxy.mp4`);
+    const rel = relative3(root, dirname8(file));
+    const target = join14(resolve5(proxyDir), basename11(root), rel, `${basename11(file, extname8(file))}_Proxy.mp4`);
     const key = target.toLowerCase();
     if (seen.has(key)) throw new Error(`two originals would get the same proxy name: ${target}`);
     seen.add(key);
@@ -33510,17 +34207,17 @@ async function planProxies(sources, proxyDir) {
   };
   const walk3 = async (dir, root) => {
     for (const e of (await readdir6(dir, { withFileTypes: true })).sort((a2, b) => a2.name.localeCompare(b.name))) {
-      const full = join11(dir, e.name);
+      const full = join14(dir, e.name);
       if (e.isDirectory()) {
         if (resolve5(full).toLowerCase() !== resolve5(proxyDir).toLowerCase()) await walk3(full, root);
-      } else if (e.isFile() && VIDEO.has(extname8(e.name).toLowerCase()) && !/_proxy$/i.test(basename9(e.name, extname8(e.name)))) add(full, root);
+      } else if (e.isFile() && VIDEO.has(extname8(e.name).toLowerCase()) && !/_proxy$/i.test(basename11(e.name, extname8(e.name)))) add(full, root);
     }
   };
   for (const s of sources.map((x) => resolve5(x))) {
     const st = await stat8(s).catch(() => void 0);
     if (!st) throw new Error(`not found: ${s}`);
     if (st.isDirectory()) await walk3(s, s);
-    else add(s, dirname7(s));
+    else add(s, dirname8(s));
   }
   return out2;
 }
@@ -33546,7 +34243,7 @@ function estimateProxyBytes(durationSec, height = 540) {
 async function makeProxies(tools, encoders, jobs, opts = {}) {
   const spawn2 = opts.spawn ?? execa;
   const height = opts.height ?? 540;
-  const todo = jobs.filter((j) => !existsSync14(j.proxy));
+  const todo = jobs.filter((j) => !existsSync16(j.proxy));
   if (todo.length) {
     let need = 0;
     for (const j of todo) need += estimateProxyBytes((await probeSource(tools, j.source, spawn2)).durationSec, height);
@@ -33562,15 +34259,15 @@ async function makeProxies(tools, encoders, jobs, opts = {}) {
     const j = jobs[i2];
     opts.onProgress?.(i2, jobs.length, j.source);
     if (opts.signal?.aborted) throw new Error("cancelled");
-    if (existsSync14(j.proxy)) {
+    if (existsSync16(j.proxy)) {
       rows.push({ ...j, status: "exists" });
       continue;
     }
     try {
       const info = await probeSource(tools, j.source, spawn2);
-      await mkdir12(dirname7(j.proxy), { recursive: true });
-      const tmp = join11(dirname7(j.proxy), `.${basename9(j.proxy, ".mp4")}.part.mp4`);
-      await rm8(tmp, { force: true });
+      await mkdir13(dirname8(j.proxy), { recursive: true });
+      const tmp = join14(dirname8(j.proxy), `.${basename11(j.proxy, ".mp4")}.part.mp4`);
+      await rm9(tmp, { force: true });
       const audio = info.audioStreams > 0 ? ["-map", "0:a", "-c:a", "aac", "-b:a", "192k"] : [];
       const tc = info.timecode ? ["-timecode", info.timecode, "-write_tmcd", "1"] : [];
       const run6 = async (gpu) => spawn2(tools.ffmpeg, [
@@ -33598,21 +34295,21 @@ async function makeProxies(tools, encoders, jobs, opts = {}) {
       ], { reject: false, windowsHide: true, timeout: Math.max(6e5, info.durationSec * 2e4), ...opts.signal ? { cancelSignal: opts.signal } : {} });
       let r = await run6(encoders.h264_nvenc);
       if (r.exitCode !== 0 && encoders.h264_nvenc) {
-        await rm8(tmp, { force: true });
+        await rm9(tmp, { force: true });
         r = await run6(false);
       }
       if (r.exitCode !== 0) throw new Error(String(r.stderr).slice(-500));
       const [a2, b] = await Promise.all([probeFrameCount(tools, j.source, spawn2, opts.signal), probeFrameCount(tools, tmp, spawn2, opts.signal)]);
       if (a2 !== b) {
-        await rm8(tmp, { force: true });
+        await rm9(tmp, { force: true });
         throw new Error(`frame count differs: original ${a2}, proxy ${b}`);
       }
-      if (existsSync14(j.proxy)) {
-        await rm8(tmp, { force: true });
+      if (existsSync16(j.proxy)) {
+        await rm9(tmp, { force: true });
         rows.push({ ...j, status: "exists" });
         continue;
       }
-      await rename10(tmp, j.proxy);
+      await rename11(tmp, j.proxy);
       const size = (await stat8(j.proxy)).size;
       bytes += size;
       rows.push({ ...j, status: "made", frames: b, bytes: size });
@@ -33639,9 +34336,9 @@ var init_proxy = __esm({
 });
 
 // src/mcp/tools-media.ts
-import { existsSync as existsSync15 } from "node:fs";
-import { mkdir as mkdir13, writeFile as writeFile11 } from "node:fs/promises";
-import { join as join12, resolve as resolve6 } from "node:path";
+import { existsSync as existsSync17 } from "node:fs";
+import { mkdir as mkdir14, writeFile as writeFile12 } from "node:fs/promises";
+import { join as join15, resolve as resolve6 } from "node:path";
 async function runJob2(state, name, wait, fn) {
   const job = state.jobs.start(name, fn);
   const pending2 = () => ({ ok: true, jobId: job.id, status: state.jobs.get(job.id)?.status ?? job.status, pending: true, hint: "\u0E22\u0E31\u0E07\u0E17\u0E33\u0E07\u0E32\u0E19\u0E2D\u0E22\u0E39\u0E48 \u2014 \u0E23\u0E2D\u0E1C\u0E25\u0E14\u0E49\u0E27\u0E22 job_wait {id} / still running: call job_wait {id}" });
@@ -33659,12 +34356,12 @@ async function runJob2(state, name, wait, fn) {
   throw new ToolError(info.error ?? `${name} ${info.status}`, { jobId: job.id, status: info.status });
 }
 function mediaPath(a2) {
-  if (a2.kind === "aecomp") return a2.render?.path && existsSync15(a2.render.path) ? a2.render.path : void 0;
+  if (a2.kind === "aecomp") return a2.render?.path && existsSync17(a2.render.path) ? a2.render.path : void 0;
   if (a2.kind === "still" || a2.kind === "audio") return void 0;
   return a2.path;
 }
 function shotsDir(p) {
-  return join12(p.dir, "cache", "shots");
+  return join15(p.dir, "cache", "shots");
 }
 function defaultAssetIds(p) {
   const used = [...new Set(p.timeline.video.map((c3) => c3.src))].filter((id) => p.assets[id] && mediaPath(p.assets[id]));
@@ -33683,7 +34380,7 @@ async function cachedShots(state, p, ids, threshold) {
   for (const id of ids) {
     const a2 = p.assets[id];
     const path12 = a2 && mediaPath(a2);
-    if (!a2 || !path12 || !existsSync15(path12)) continue;
+    if (!a2 || !path12 || !existsSync17(path12)) continue;
     const idx = await loadCachedShots(shotsDir(p), await contentHash(a2, path12), { fps: p.meta.fps, threshold, ffmpegVersion: ver });
     if (idx) map.set(id, idx);
     else missing.push(id);
@@ -33699,16 +34396,16 @@ function countBy(issues) {
   return out2;
 }
 async function backupTimeline2(p, reason) {
-  const dir = join12(p.dir, "history");
-  await mkdir13(dir, { recursive: true });
+  const dir = join15(p.dir, "history");
+  await mkdir14(dir, { recursive: true });
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const stamp = now.replace(/[:.]/g, "-");
   const body2 = `${JSON.stringify({ savedAt: now, reason, timeline: p.timeline }, null, 2)}
 `;
   for (let n2 = 1; ; n2++) {
-    const file = join12(dir, `timeline-${stamp}-${n2}.json`);
+    const file = join15(dir, `timeline-${stamp}-${n2}.json`);
     try {
-      await writeFile11(file, body2, { encoding: "utf8", flag: "wx" });
+      await writeFile12(file, body2, { encoding: "utf8", flag: "wx" });
       return file;
     } catch (e) {
       if (e.code !== "EEXIST") throw e;
@@ -33759,7 +34456,7 @@ var init_tools_media = __esm({
               ctx.progress({ stage: "shots", done, total: ids.length, message: id });
               const asset = p.assets[id];
               const path12 = mediaPath(asset);
-              if (!path12 || !existsSync15(path12)) {
+              if (!path12 || !existsSync17(path12)) {
                 skipped.push({ assetId: id, reason: asset.kind === "aecomp" ? "\u0E22\u0E31\u0E07\u0E44\u0E21\u0E48\u0E21\u0E35 render / no render yet" : asset.kind === "still" || asset.kind === "audio" ? "\u0E44\u0E21\u0E48\u0E43\u0E0A\u0E48\u0E27\u0E34\u0E14\u0E35\u0E42\u0E2D / not video" : "\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E44\u0E1F\u0E25\u0E4C / file missing" });
                 done++;
                 continue;
@@ -33922,9 +34619,9 @@ var init_tools_media = __esm({
         handler: async (a2, state) => {
           requireFfmpeg(state);
           const dir = resolve6(a2.dir);
-          if (!existsSync15(dir)) throw new ToolError(`\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E42\u0E1F\u0E25\u0E40\u0E14\u0E2D\u0E23\u0E4C / folder not found: ${dir}`);
+          if (!existsSync17(dir)) throw new ToolError(`\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E42\u0E1F\u0E25\u0E40\u0E14\u0E2D\u0E23\u0E4C / folder not found: ${dir}`);
           const p = a2.apply ? requireProject(state) : state.project;
-          const aliasDir = p ? join12(p.dir, "media-aliases") : void 0;
+          const aliasDir = p ? join15(p.dir, "media-aliases") : void 0;
           if (a2.apply && aliasDir && isProtected(aliasDir)) throw new ToolError("\u0E2B\u0E49\u0E32\u0E21\u0E40\u0E02\u0E35\u0E22\u0E19\u0E43\u0E19\u0E42\u0E1F\u0E25\u0E40\u0E14\u0E2D\u0E23\u0E4C\u0E17\u0E35\u0E48\u0E1B\u0E49\u0E2D\u0E07\u0E01\u0E31\u0E19\u0E44\u0E27\u0E49 / protected path", { path: aliasDir });
           return runJob2(state, "scan_footage", a2.wait, async (ctx) => {
             const report2 = await scanFootage(state.env.tools, dir, {
@@ -33952,7 +34649,8 @@ var init_tools_media = __esm({
 
 // src/engine/comp-lint.ts
 import { readdir as readdir7 } from "node:fs/promises";
-import { basename as basename10, extname as extname9, join as join13, resolve as resolve7 } from "node:path";
+import os11 from "node:os";
+import { basename as basename12, extname as extname9, join as join16, resolve as resolve7 } from "node:path";
 function samePath4(a2, b) {
   const x = resolve7(a2), y = resolve7(b);
   return process.platform === "win32" ? x.toLowerCase() === y.toLowerCase() : x === y;
@@ -34044,6 +34742,15 @@ async function lintComps(backend, targets, project2, opts = {}) {
   opts.onProgress?.({ stage: "comp_lint", done, total: targets.length });
   return report2;
 }
+function macFontDirs(home) {
+  return [
+    join16(home, "Library", "Fonts"),
+    "/Library/Fonts",
+    "/System/Library/Fonts",
+    "/System/Library/Fonts/Supplemental",
+    "/Library/Application Support/Adobe/Fonts"
+  ];
+}
 function parseRegFonts(out2) {
   const rows = [];
   for (const line of out2.split(/\r?\n/)) {
@@ -34075,18 +34782,18 @@ async function listInstalledFonts(src = {}) {
     if (rows.length) sources.push(`${key} (${rows.length})`);
     for (const r of rows) {
       names.push(r.name);
-      if (r.file) names.push(basename10(r.file, extname9(r.file)));
+      if (r.file) names.push(basename12(r.file, extname9(r.file)));
     }
   }
-  const dirs = [
-    join13(env["WINDIR"] ?? env["SystemRoot"] ?? "C:\\Windows", "Fonts"),
-    ...env["LOCALAPPDATA"] ? [join13(env["LOCALAPPDATA"], "Microsoft", "Windows", "Fonts")] : [],
-    join13(env["CommonProgramFiles"] ?? "C:\\Program Files\\Common Files", "Adobe", "Fonts")
+  const dirs = (src.platform ?? process.platform) === "darwin" ? macFontDirs(env["HOME"] ?? os11.homedir()) : [
+    join16(env["WINDIR"] ?? env["SystemRoot"] ?? "C:\\Windows", "Fonts"),
+    ...env["LOCALAPPDATA"] ? [join16(env["LOCALAPPDATA"], "Microsoft", "Windows", "Fonts")] : [],
+    join16(env["CommonProgramFiles"] ?? "C:\\Program Files\\Common Files", "Adobe", "Fonts")
   ];
   for (const dir of dirs) {
     const files = (await readDir(dir)).filter((f) => FONT_EXT.has(extname9(f).toLowerCase()));
     if (files.length) sources.push(`${dir} (${files.length})`);
-    for (const f of files) names.push(basename10(f, extname9(f)));
+    for (const f of files) names.push(basename12(f, extname9(f)));
   }
   return { names, sources };
 }
@@ -34154,9 +34861,9 @@ var init_comp_lint = __esm({
 });
 
 // src/mcp/tools-ae.ts
-import { existsSync as existsSync16 } from "node:fs";
-import { mkdir as mkdir14 } from "node:fs/promises";
-import { basename as basename11, extname as extname10, join as join14, resolve as resolve8 } from "node:path";
+import { existsSync as existsSync18 } from "node:fs";
+import { mkdir as mkdir15 } from "node:fs/promises";
+import { basename as basename13, extname as extname10, join as join17, resolve as resolve8 } from "node:path";
 async function runAeJob(state, name, fn) {
   const job = state.jobs.start(name, fn);
   let timer;
@@ -34193,7 +34900,7 @@ function stripFrames(duration3, n2) {
 }
 function requireAep(path12) {
   const aep = resolve8(path12);
-  if (!existsSync16(aep)) throw new ToolError(`\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E44\u0E1F\u0E25\u0E4C .aep / project not found: ${aep}`);
+  if (!existsSync18(aep)) throw new ToolError(`\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E44\u0E1F\u0E25\u0E4C .aep / project not found: ${aep}`);
   return aep;
 }
 var AE_WAIT_MS, ADVISORY, AE_TOOLS;
@@ -34226,7 +34933,7 @@ var init_tools_ae = __esm({
           if (!ae.scanTemplate) throw new ToolError("backend \u0E19\u0E35\u0E49\u0E2A\u0E41\u0E01\u0E19 template \u0E44\u0E21\u0E48\u0E44\u0E14\u0E49 / this AE backend cannot scan templates");
           let outDir;
           if (a2.renderStrips) {
-            outDir = join14(requireProject(state).dir, "review", "templates", slug(basename11(aep, extname10(aep))));
+            outDir = join17(requireProject(state).dir, "review", "templates", slug(basename13(aep, extname10(aep))));
             if (isProtected(outDir)) throw new ToolError("\u0E2B\u0E49\u0E32\u0E21\u0E40\u0E02\u0E35\u0E22\u0E19\u0E43\u0E19\u0E42\u0E1F\u0E25\u0E40\u0E14\u0E2D\u0E23\u0E4C\u0E17\u0E35\u0E48\u0E1B\u0E49\u0E2D\u0E07\u0E01\u0E31\u0E19\u0E44\u0E27\u0E49 / refusing to write inside a protected path", { path: outDir });
           }
           return runAeJob(state, "template_scan", async (ctx) => {
@@ -34242,22 +34949,22 @@ var init_tools_ae = __esm({
             const max = a2.maxComps ?? 6;
             const skipped = chosen.slice(max).map((c3) => c3.name);
             const strips = [];
-            await mkdir14(outDir, { recursive: true });
+            await mkdir15(outDir, { recursive: true });
             const todo = chosen.slice(0, max);
             for (const [i2, c3] of todo.entries()) {
               ctx.signal.throwIfAborted();
               ctx.progress({ stage: "template_strips", done: i2, total: todo.length, message: c3.name });
-              const frames3 = stripFrames(c3.durationFrames, a2.framesPerComp ?? 3);
+              const frames4 = stripFrames(c3.durationFrames, a2.framesPerComp ?? 3);
               const paths = [];
               try {
-                for (const f of frames3) {
-                  const target = uniqueOutputPath(join14(outDir, `${slug(c3.name)}_f${String(f).padStart(5, "0")}.png`));
+                for (const f of frames4) {
+                  const target = uniqueOutputPath(join17(outDir, `${slug(c3.name)}_f${String(f).padStart(5, "0")}.png`));
                   paths.push(await ae.previewFrame(aep, c3.name, f, target));
                 }
-                strips.push({ comp: c3.name, frames: frames3, paths });
+                strips.push({ comp: c3.name, frames: frames4, paths });
               } catch (e) {
                 ctx.log(`strip ${c3.name}: ${e instanceof Error ? e.message : String(e)}`);
-                strips.push({ comp: c3.name, frames: frames3, paths, error: e instanceof Error ? e.message : String(e) });
+                strips.push({ comp: c3.name, frames: frames4, paths, error: e instanceof Error ? e.message : String(e) });
               }
             }
             return { ...scan, strips, stripsDir: outDir, ...skipped.length ? { skippedStrips: skipped } : {}, advisory: ADVISORY };
@@ -34316,7 +35023,7 @@ var init_tools_ae = __esm({
         description: "\u0E25\u0E49\u0E32\u0E07 cache \u0E02\u0E2D\u0E07 After Effects (app.purge ALL_CACHES \u0E43\u0E19\u0E2D\u0E34\u0E19\u0E2A\u0E41\u0E15\u0E19\u0E0B\u0E4C headless); ifBelowGb = \u0E25\u0E49\u0E32\u0E07\u0E40\u0E09\u0E1E\u0E32\u0E30\u0E40\u0E21\u0E37\u0E48\u0E2D\u0E44\u0E14\u0E23\u0E1F\u0E4C cache \u0E40\u0E2B\u0E25\u0E37\u0E2D\u0E19\u0E49\u0E2D\u0E22\u0E01\u0E27\u0E48\u0E32\u0E19\u0E35\u0E49 (job) \xB7 Purge AE caches (job)",
         input: {
           ifBelowGb: external_exports.number().positive().optional().describe("only purge when the AE cache drive has less free space than this"),
-          cacheDir: external_exports.string().optional().describe("folder on the AE disk-cache drive (default EDITMCP_AE_CACHE_DIR or %LOCALAPPDATA%)")
+          cacheDir: external_exports.string().optional().describe("folder on the AE disk-cache drive (default EDITMCP_AE_CACHE_DIR, else %LOCALAPPDATA% / ~/Library/Caches)")
         },
         handler: async (a2, state) => {
           if (!state.ae.purgeCaches) throw new ToolError("backend \u0E19\u0E35\u0E49\u0E25\u0E49\u0E32\u0E07 cache \u0E44\u0E21\u0E48\u0E44\u0E14\u0E49 / this AE backend cannot purge caches");
@@ -34338,8 +35045,8 @@ var init_tools_ae = __esm({
 
 // src/core/rules.ts
 import { randomBytes as randomBytes7 } from "node:crypto";
-import { existsSync as existsSync17 } from "node:fs";
-import { mkdir as mkdir15 } from "node:fs/promises";
+import { existsSync as existsSync19 } from "node:fs";
+import { mkdir as mkdir16 } from "node:fs/promises";
 import path11 from "node:path";
 function listConstraints(p) {
   return p.constraints ?? [];
@@ -34766,44 +35473,45 @@ function matcher(p, t, shots, warnings) {
 }
 async function extractEvidence(tools, p, plan, opts = {}) {
   if (!plan.instances.length) throw new Error("no instances to extract");
-  if (!existsSync17(plan.master)) throw new Error(`master not found: ${plan.master}`);
+  if (!existsSync19(plan.master)) throw new Error(`master not found: ${plan.master}`);
   const dir = path11.join(p.dir, "review", "evidence", safeName(plan.versionId));
-  await mkdir15(dir, { recursive: true });
+  await mkdir16(dir, { recursive: true });
   const stamp = `${(/* @__PURE__ */ new Date()).toISOString().replace(/[-:]/g, "").replace(/\..*$/, "")}_${randomBytes7(2).toString("hex")}`;
-  const frames3 = [];
+  const frames4 = [];
   const warnings = [...plan.warnings];
   for (const inst of plan.instances) {
     const out2 = freePath2(path11.join(dir, `${stamp}_${String(inst.instance).padStart(2, "0")}_${safeName(inst.clipId)}_f${inst.frame}.png`));
     const ss = (Math.max(0, inst.frame - 0.25) / plan.fps).toFixed(6);
     const r = await ff(tools.ffmpeg, ["-ss", ss, "-i", plan.master, "-map", "0:v:0", "-frames:v", "1", "-update", "1", out2], opts.signal);
-    if (r.exitCode !== 0 || !existsSync17(out2)) {
+    if (r.exitCode !== 0 || !existsSync19(out2)) {
       warnings.push(`\u0E14\u0E36\u0E07\u0E40\u0E1F\u0E23\u0E21 ${inst.frame} (${inst.clipId}) \u0E44\u0E21\u0E48\u0E2A\u0E33\u0E40\u0E23\u0E47\u0E08: ${r.tail}`);
       continue;
     }
-    frames3.push({ ...inst, path: out2 });
+    frames4.push({ ...inst, path: out2 });
   }
   let contactSheet2;
-  if (frames3.length) {
+  if (frames4.length) {
     const sheet = freePath2(path11.join(dir, `${stamp}_contact.png`));
-    contactSheet2 = await tileFrames(tools.ffmpeg, frames3, sheet, opts.signal);
+    contactSheet2 = await tileFrames(tools.ffmpeg, frames4, sheet, opts.signal);
     if (!contactSheet2) warnings.push("\u0E2A\u0E23\u0E49\u0E32\u0E07 contact sheet \u0E44\u0E21\u0E48\u0E2A\u0E33\u0E40\u0E23\u0E47\u0E08 / contact sheet failed");
   }
-  return { dir, frames: frames3, ...contactSheet2 ? { contactSheet: contactSheet2 } : {}, warnings };
+  return { dir, frames: frames4, ...contactSheet2 ? { contactSheet: contactSheet2 } : {}, warnings };
 }
-async function tileFrames(ffmpeg, frames3, out2, signal) {
-  const cols = Math.min(SHEET_COLUMNS2, frames3.length);
-  const rows = Math.ceil(frames3.length / cols);
-  const fontOpts = existsSync17(WINDOWS_FONT3) ? [`fontfile='${WINDOWS_FONT3.replace(":", "\\:")}'`, void 0] : [void 0];
+async function tileFrames(ffmpeg, frames4, out2, signal) {
+  const cols = Math.min(SHEET_COLUMNS2, frames4.length);
+  const rows = Math.ceil(frames4.length / cols);
+  const labelFont = labelFontOpt();
+  const fontOpts = labelFont ? [labelFont, void 0] : [void 0];
   for (const font of fontOpts) {
-    const chains = frames3.map((f, i2) => {
+    const chains = frames4.map((f, i2) => {
       const label = `#${f.instance} ${safeName(f.clipId)} ${f.tc}`.replace(/:/g, "\\:");
       const draw = font ? `,drawtext=${font}:fontsize=22:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=4:x=8:y=8:text='${label}'` : "";
       return `[${i2}:v]scale=${SHEET_THUMB_WIDTH2}:-2,setsar=1,format=rgb24${draw}[v${i2}]`;
     });
-    const graph = `${chains.join(";")};${frames3.map((_, i2) => `[v${i2}]`).join("")}concat=n=${frames3.length}:v=1:a=0,tile=layout=${cols}x${rows}:padding=4:margin=4:color=0x202020`;
-    const args = [...frames3.flatMap((f) => ["-i", f.path]), "-filter_complex", graph, "-frames:v", "1", "-update", "1", out2];
+    const graph = `${chains.join(";")};${frames4.map((_, i2) => `[v${i2}]`).join("")}concat=n=${frames4.length}:v=1:a=0,tile=layout=${cols}x${rows}:padding=4:margin=4:color=0x202020`;
+    const args = [...frames4.flatMap((f) => ["-i", f.path]), "-filter_complex", graph, "-frames:v", "1", "-update", "1", out2];
     const r = await ff(ffmpeg, args, signal);
-    if (r.exitCode === 0 && existsSync17(out2)) return out2;
+    if (r.exitCode === 0 && existsSync19(out2)) return out2;
   }
   return void 0;
 }
@@ -34824,20 +35532,21 @@ function safeName(s) {
   return s.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "x";
 }
 function freePath2(p) {
-  if (!existsSync17(p)) return p;
+  if (!existsSync19(p)) return p;
   const ext = path11.extname(p);
   const base = p.slice(0, p.length - ext.length);
   for (let i2 = 2; ; i2++) {
     const c3 = `${base}_${i2}${ext}`;
-    if (!existsSync17(c3)) return c3;
+    if (!existsSync19(c3)) return c3;
   }
 }
-var RuleConflictError, QUOTE_MAX, MACHINE_CHECKS, VISUAL_CHECKS, SourceSchema, ConstraintInputSchema, HEX, pct, StylePatchSchema, LOGO_RE, WINDOWS_FONT3, SHEET_COLUMNS2, SHEET_THUMB_WIDTH2, FRAME_TIMEOUT_MS;
+var RuleConflictError, QUOTE_MAX, MACHINE_CHECKS, VISUAL_CHECKS, SourceSchema, ConstraintInputSchema, HEX, pct, StylePatchSchema, LOGO_RE, SHEET_COLUMNS2, SHEET_THUMB_WIDTH2, FRAME_TIMEOUT_MS;
 var init_rules = __esm({
   "src/core/rules.ts"() {
     "use strict";
     init_execa();
     init_zod();
+    init_platform();
     init_project();
     init_timecode();
     RuleConflictError = class extends Error {
@@ -34882,7 +35591,6 @@ var init_rules = __esm({
       maxStaticSec: external_exports.number().positive().max(3600).nullable().optional()
     }).strict();
     LOGO_RE = /logo|โลโก้/i;
-    WINDOWS_FONT3 = "C:/Windows/Fonts/arial.ttf";
     SHEET_COLUMNS2 = 4;
     SHEET_THUMB_WIDTH2 = 480;
     FRAME_TIMEOUT_MS = 12e4;
@@ -35241,9 +35949,9 @@ var init_joins = __esm({
 });
 
 // src/mcp/tools-edit.ts
-import { existsSync as existsSync18 } from "node:fs";
-import { mkdir as mkdir16, writeFile as writeFile12 } from "node:fs/promises";
-import { join as join15 } from "node:path";
+import { existsSync as existsSync20 } from "node:fs";
+import { mkdir as mkdir17, writeFile as writeFile13 } from "node:fs/promises";
+import { join as join18 } from "node:path";
 function activeJob(state) {
   return state.jobs.list().find((j) => (j.status === "running" || j.status === "queued") && PROJECT_JOBS.includes(j.name));
 }
@@ -35264,16 +35972,16 @@ async function runJob3(state, name, wait, fn) {
   throw new ToolError(info.error ?? `${name} ${info.status}`, { jobId: job.id, status: info.status });
 }
 async function backupTimeline3(p, reason) {
-  const dir = join15(p.dir, "history");
-  await mkdir16(dir, { recursive: true });
+  const dir = join18(p.dir, "history");
+  await mkdir17(dir, { recursive: true });
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const stamp = now.replace(/[:.]/g, "-");
   const body2 = `${JSON.stringify({ savedAt: now, reason, timeline: p.timeline }, null, 2)}
 `;
   for (let n2 = 1; ; n2++) {
-    const file = join15(dir, `timeline-${stamp}-${n2}.json`);
+    const file = join18(dir, `timeline-${stamp}-${n2}.json`);
     try {
-      await writeFile12(file, body2, { encoding: "utf8", flag: "wx" });
+      await writeFile13(file, body2, { encoding: "utf8", flag: "wx" });
       return file;
     } catch (e) {
       if (e.code !== "EEXIST") throw e;
@@ -35429,7 +36137,7 @@ var init_tools_edit = __esm({
             const old = snap?.render;
             if (!old) render2 = { action: "none", reason: "no render recorded for this shot" };
             else if (asset.render?.path === old.path && asset.render.renderedAt === old.renderedAt) render2 = { action: "unchanged", path: old.path };
-            else if (!existsSync18(old.path)) {
+            else if (!existsSync20(old.path)) {
               render2 = { action: "missing", path: old.path };
               warnings.push(`\u0E44\u0E1F\u0E25\u0E4C render \u0E02\u0E2D\u0E07 ${v.id} \u0E44\u0E21\u0E48\u0E2D\u0E22\u0E39\u0E48\u0E41\u0E25\u0E49\u0E27 (${old.path}) \u2014 build \u0E08\u0E30 render comp \u0E2A\u0E16\u0E32\u0E19\u0E30\u0E1B\u0E31\u0E08\u0E08\u0E38\u0E1A\u0E31\u0E19 / the old render is gone: the build renders the comp as it is now`);
             } else {
@@ -35501,7 +36209,7 @@ var init_tools_edit = __esm({
           if (!(a2.to > a2.from)) throw new ToolError(`\u0E0A\u0E48\u0E27\u0E07\u0E44\u0E21\u0E48\u0E16\u0E39\u0E01\u0E15\u0E49\u0E2D\u0E07 / bad range: to (${a2.to}) must be > from (${a2.from})`);
           if (a2.version) {
             const v = findVersion(p, a2.version);
-            if (!existsSync18(v.master)) throw new ToolError(`\u0E44\u0E21\u0E48\u0E1E\u0E1A master \u0E02\u0E2D\u0E07 ${v.id} / master missing: ${v.master}`);
+            if (!existsSync20(v.master)) throw new ToolError(`\u0E44\u0E21\u0E48\u0E1E\u0E1A master \u0E02\u0E2D\u0E07 ${v.id} / master missing: ${v.master}`);
           } else {
             const errors = state.api.project.validateTimeline(p);
             if (errors.length) throw new ToolError("timeline \u0E44\u0E21\u0E48\u0E1C\u0E48\u0E32\u0E19\u0E01\u0E32\u0E23\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A / timeline invalid", { errors });
@@ -35532,7 +36240,7 @@ var init_tools_edit = __esm({
 });
 
 // src/mcp/tools-review2.ts
-import { join as join16 } from "node:path";
+import { join as join19 } from "node:path";
 function version2(p, id) {
   const v = p.versions.find((x) => x.id === id);
   if (!v) throw new ToolError(`\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E40\u0E27\u0E2D\u0E23\u0E4C\u0E0A\u0E31\u0E19 / unknown version: ${id}`);
@@ -35571,7 +36279,7 @@ var init_tools_review2 = __esm({
             const planA = versionPlan(p, va), planB = versionPlan(p, vb);
             if (planA.fps !== planB.fps) throw new ToolError(`fps \u0E15\u0E48\u0E32\u0E07\u0E01\u0E31\u0E19 / fps differ (${planA.fps} vs ${planB.fps})`);
             const { pairs, map } = comparePairs(planA, planB, { ...a2.clipIds ? { clipIds: a2.clipIds } : {}, ...a2.frames ? { frames: a2.frames } : {} });
-            const outPath = join16(state.api.project.projectPaths(p).review, "compare", `${va.id}_vs_${vb.id}.png`);
+            const outPath = join19(state.api.project.projectPaths(p).review, "compare", `${va.id}_vs_${vb.id}.png`);
             return await renderCompareSheet({
               tools: state.env.tools,
               map,
@@ -35608,34 +36316,35 @@ __export(premiere_exports, {
   uninstallBridge: () => uninstallBridge
 });
 import { spawn as nodeSpawn } from "node:child_process";
-import { existsSync as existsSync19 } from "node:fs";
-import { cp, mkdir as mkdir17, readFile as readFile12, rename as rename11, rm as rm9, unlink as unlink3, writeFile as writeFile13 } from "node:fs/promises";
-import os8 from "node:os";
-import { dirname as dirname8, join as join17, resolve as resolve9 } from "node:path";
+import { existsSync as existsSync21 } from "node:fs";
+import { cp, mkdir as mkdir18, readFile as readFile13, rename as rename12, rm as rm10, unlink as unlink3, writeFile as writeFile14 } from "node:fs/promises";
+import os12 from "node:os";
+import { dirname as dirname9, join as join20, resolve as resolve9 } from "node:path";
 import { randomUUID as randomUUID4 } from "node:crypto";
 import { fileURLToPath as fileURLToPath5 } from "node:url";
 function legacyQueueDir() {
-  return join17(os8.tmpdir(), "catcut-premiere-bridge");
+  return join20(os12.tmpdir(), "catcut-premiere-bridge");
 }
 function defaultQueueDir() {
   const env = process.env["CATCUT_PREMIERE_BRIDGE_DIR"];
   if (env) return env;
-  const local = process.env["LOCALAPPDATA"];
-  return local && isAscii(local) ? join17(local, "CatCut", "bridge") : legacyQueueDir();
+  const local = process.platform === "win32" ? process.env["LOCALAPPDATA"] : localAppDataDir();
+  return local && isAscii(local) ? join20(local, "CatCut", "bridge") : legacyQueueDir();
 }
 function cepExtensionsDir() {
-  return join17(process.env["APPDATA"] ?? join17(os8.homedir(), "AppData", "Roaming"), "Adobe", "CEP", "extensions");
+  if (process.platform === "darwin") return join20(localAppDataDir(), "Adobe", "CEP", "extensions");
+  return join20(process.env["APPDATA"] ?? join20(os12.homedir(), "AppData", "Roaming"), "Adobe", "CEP", "extensions");
 }
 function createPremiereClient(opts = {}) {
   const dirs = opts.queueDir ? [opts.queueDir] : [.../* @__PURE__ */ new Set([defaultQueueDir(), legacyQueueDir()])];
   let queueDir = dirs[0];
   const staleMs = opts.staleMs ?? 1e4;
   const pollMs = opts.pollMs ?? 100;
-  const installDir = opts.installDir ?? join17(cepExtensionsDir(), BRIDGE_ID);
+  const installDir = opts.installDir ?? join20(cepExtensionsDir(), BRIDGE_ID);
   let chain = Promise.resolve();
   async function beatIn(dir) {
     try {
-      const hb = JSON.parse((await readFile12(join17(dir, "bridge.json"), "utf8")).replace(/^﻿/, ""));
+      const hb = JSON.parse((await readFile13(join20(dir, "bridge.json"), "utf8")).replace(/^﻿/, ""));
       return hb && typeof hb.ts === "number" ? hb : void 0;
     } catch {
       return void 0;
@@ -35650,7 +36359,7 @@ function createPremiereClient(opts = {}) {
         queueDir = d;
       }
     }
-    const base = { installed: existsSync19(join17(installDir, "CSXS", "manifest.xml")), installDir, connected: false, queueDir };
+    const base = { installed: existsSync21(join20(installDir, "CSXS", "manifest.xml")), installDir, connected: false, queueDir };
     if (!hb) return base;
     const age = Date.now() - hb.ts;
     return {
@@ -35673,16 +36382,16 @@ function createPremiereClient(opts = {}) {
       throw new UserActionError(`Premiere is still busy with '${st.busy.action}' (${st.busy.seconds} s)`, ACTIONS.premiereDialog({ action: st.busy.action, seconds: st.busy.seconds }));
     }
     const id = `${Date.now().toString(36).padStart(9, "0")}-${randomUUID4().slice(0, 8)}`;
-    const req = join17(queueDir, `${id}.req.json`);
-    const res = join17(queueDir, `${id}.res.json`);
-    await mkdir17(queueDir, { recursive: true });
-    await writeFile13(`${req}.tmp`, JSON.stringify({ id, action, args, deadline: Date.now() + timeoutMs }), "utf8");
-    await rename11(`${req}.tmp`, req);
+    const req = join20(queueDir, `${id}.req.json`);
+    const res = join20(queueDir, `${id}.res.json`);
+    await mkdir18(queueDir, { recursive: true });
+    await writeFile14(`${req}.tmp`, JSON.stringify({ id, action, args, deadline: Date.now() + timeoutMs }), "utf8");
+    await rename12(`${req}.tmp`, req);
     const until = Date.now() + timeoutMs;
     for (; ; ) {
       let raw;
       try {
-        raw = await readFile12(res, "utf8");
+        raw = await readFile13(res, "utf8");
       } catch {
       }
       if (raw !== void 0) {
@@ -35721,18 +36430,29 @@ function createPremiereClient(opts = {}) {
 }
 async function stagePath(client2, ext) {
   if (!isAscii(client2.queueDir)) throw new Error(`Premiere bridge folder must be an ASCII path: ${client2.queueDir} (set TEMP/TMP to an ASCII folder)`);
-  const dir = join17(client2.queueDir, "files");
-  await mkdir17(dir, { recursive: true });
-  return join17(dir, `${Date.now().toString(36)}-${randomUUID4().slice(0, 8)}${ext}`);
+  const dir = join20(client2.queueDir, "files");
+  await mkdir18(dir, { recursive: true });
+  return join20(dir, `${Date.now().toString(36)}-${randomUUID4().slice(0, 8)}${ext}`);
 }
 function premiereHost(spawn2 = execa) {
   return {
     async running() {
-      if (process.platform !== "win32") return [];
+      if (process.platform !== "win32") {
+        return (await listPosixProcesses()).filter((p) => isBundleProcess(p.command, /^Adobe Premiere Pro\b/i)).map((p) => p.pid);
+      }
       const r = await spawn2("tasklist", ["/FO", "CSV", "/NH", "/FI", "IMAGENAME eq Adobe Premiere Pro.exe"], { reject: false, windowsHide: true, timeout: 15e3 });
       return String(r.stdout ?? "").split(/\r?\n/).map((l) => /^"Adobe Premiere Pro\.exe","(\d+)"/i.exec(l)?.[1]).filter((x) => !!x).map(Number);
     },
     async debugModeMissing() {
+      if (process.platform === "darwin") {
+        const missing2 = [];
+        for (const v of CSXS_VERSIONS) {
+          const domain = `com.adobe.CSXS.${v}`;
+          const r = await spawn2("defaults", ["read", domain, "PlayerDebugMode"], { reject: false, timeout: 15e3 });
+          if (r.exitCode !== 0 || String(r.stdout ?? "").trim() !== "1") missing2.push(domain);
+        }
+        return missing2;
+      }
       if (process.platform !== "win32") return [];
       const missing = [];
       for (const v of CSXS_VERSIONS) {
@@ -35742,8 +36462,8 @@ function premiereHost(spawn2 = execa) {
       }
       return missing;
     },
-    launch(exe, project2) {
-      const child2 = nodeSpawn(exe, [project2], { detached: true, stdio: "ignore", windowsHide: false });
+    launch(exe2, project2) {
+      const child2 = /\.app\/?$/i.test(exe2) ? nodeSpawn("open", ["-a", exe2, project2], { detached: true, stdio: "ignore" }) : nodeSpawn(exe2, [project2], { detached: true, stdio: "ignore", windowsHide: false });
       child2.on("error", () => void 0);
       child2.unref();
       return { pid: child2.pid };
@@ -35752,7 +36472,7 @@ function premiereHost(spawn2 = execa) {
 }
 async function packageVersion(dir) {
   try {
-    return JSON.parse(await readFile12(join17(dir, "package.json"), "utf8")).version;
+    return JSON.parse(await readFile13(join20(dir, "package.json"), "utf8")).version;
   } catch {
     return void 0;
   }
@@ -35787,7 +36507,7 @@ async function diagnosePremiere(client2, host2, opts = {}) {
 async function openPremiere(client2, host2, opts) {
   const project2 = resolve9(opts.project);
   if (!/\.prproj$/i.test(project2)) throw new Error(`not a Premiere project (.prproj): ${project2}`);
-  if (!existsSync19(project2)) throw new Error(`Premiere project not found: ${project2}`);
+  if (!existsSync21(project2)) throw new Error(`Premiere project not found: ${project2}`);
   const waitMs = opts.waitMs ?? 24e4;
   const pollMs = opts.pollMs ?? 1e3;
   let d = await diagnosePremiere(client2, host2, { ...opts.premiereExe ? { premiereExe: opts.premiereExe } : {}, ...opts.sourceDir ? { sourceDir: opts.sourceDir } : {} });
@@ -35827,38 +36547,39 @@ function bridgeSourceDir() {
   return fileURLToPath5(new URL("../../premiere/catcut-bridge", import.meta.url));
 }
 function bridgeBackupRoot() {
-  return join17(process.env["LOCALAPPDATA"] ?? join17(os8.homedir(), "AppData", "Local"), "CatCut", "bridge-backups");
+  return join20(localAppDataDir(), "CatCut", "bridge-backups");
 }
 async function installBridge(opts = {}) {
   const spawn2 = opts.spawn ?? execa;
   const source2 = opts.source ?? bridgeSourceDir();
-  if (!existsSync19(join17(source2, "CSXS", "manifest.xml"))) throw new Error(`bridge sources not found: ${source2}`);
-  const dest = join17(opts.extensionsDir ?? cepExtensionsDir(), BRIDGE_ID);
+  if (!existsSync21(join20(source2, "CSXS", "manifest.xml"))) throw new Error(`bridge sources not found: ${source2}`);
+  const dest = join20(opts.extensionsDir ?? cepExtensionsDir(), BRIDGE_ID);
   let backup;
   let userFile;
-  if (existsSync19(dest)) {
+  if (existsSync21(dest)) {
     const stamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-    backup = join17(opts.backupRoot ?? bridgeBackupRoot(), `${BRIDGE_ID}-${stamp}`);
-    await mkdir17(dirname8(backup), { recursive: true });
+    backup = join20(opts.backupRoot ?? bridgeBackupRoot(), `${BRIDGE_ID}-${stamp}`);
+    await mkdir18(dirname9(backup), { recursive: true });
     await cp(dest, backup, { recursive: true, errorOnExist: true, force: false });
-    if (existsSync19(join17(dest, "host.user.jsx"))) userFile = join17(backup, "host.user.jsx");
+    if (existsSync21(join20(dest, "host.user.jsx"))) userFile = join20(backup, "host.user.jsx");
   }
-  await rm9(dest, { recursive: true, force: true });
-  await mkdir17(dest, { recursive: true });
+  await rm10(dest, { recursive: true, force: true });
+  await mkdir18(dest, { recursive: true });
   await cp(source2, dest, { recursive: true });
-  if (userFile) await cp(userFile, join17(dest, "host.user.jsx"));
+  if (userFile) await cp(userFile, join20(dest, "host.user.jsx"));
   const keys = [];
+  const mac = (opts.platform ?? process.platform) === "darwin";
   for (const v of CSXS_VERSIONS) {
-    const key = `HKCU\\Software\\Adobe\\CSXS.${v}`;
-    const r = await spawn2("reg", ["add", key, "/v", "PlayerDebugMode", "/t", "REG_SZ", "/d", "1", "/f"], { reject: false, windowsHide: true, timeout: 15e3 });
-    if (r.exitCode !== 0) throw new Error(`could not set ${key}\\PlayerDebugMode: ${String(r.stderr ?? "").trim()}`);
+    const key = mac ? `com.adobe.CSXS.${v}` : `HKCU\\Software\\Adobe\\CSXS.${v}`;
+    const r = mac ? await spawn2("defaults", ["write", key, "PlayerDebugMode", "1"], { reject: false, timeout: 15e3 }) : await spawn2("reg", ["add", key, "/v", "PlayerDebugMode", "/t", "REG_SZ", "/d", "1", "/f"], { reject: false, windowsHide: true, timeout: 15e3 });
+    if (r.exitCode !== 0) throw new Error(`could not set ${key} PlayerDebugMode: ${String(r.stderr ?? "").trim()}`);
     keys.push(key);
   }
   return { installedTo: dest, debugModeKeys: keys, ...backup ? { backup } : {}, keptUserActions: !!userFile };
 }
 async function uninstallBridge(opts = {}) {
-  const dest = join17(opts.extensionsDir ?? cepExtensionsDir(), BRIDGE_ID);
-  await rm9(dest, { recursive: true, force: true });
+  const dest = join20(opts.extensionsDir ?? cepExtensionsDir(), BRIDGE_ID);
+  await rm10(dest, { recursive: true, force: true });
   return dest;
 }
 var BRIDGE_ID, PROTOCOL, DIALOG_AFTER_MS, samePath5, CSXS_VERSIONS;
@@ -35867,6 +36588,7 @@ var init_premiere = __esm({
     "use strict";
     init_execa();
     init_user_action();
+    init_platform();
     init_aerender();
     BRIDGE_ID = "com.catcut.bridge";
     PROTOCOL = 1;
@@ -35878,8 +36600,8 @@ var init_premiere = __esm({
 
 // src/mcp/tools-premiere.ts
 import { constants as constants9 } from "node:fs";
-import { copyFile as copyFile6, mkdir as mkdir18, readdir as readdir8, rm as rm10, stat as stat9 } from "node:fs/promises";
-import { basename as basename12, dirname as dirname9, extname as extname11, join as join18, relative as relative4, resolve as resolve10, sep as sep3 } from "node:path";
+import { copyFile as copyFile6, mkdir as mkdir19, readdir as readdir8, rm as rm11, stat as stat9 } from "node:fs/promises";
+import { basename as basename14, dirname as dirname10, extname as extname11, join as join21, relative as relative4, resolve as resolve10, sep as sep3 } from "node:path";
 function client(state) {
   state.premiere ??= createPremiereClient();
   return state.premiere;
@@ -35891,7 +36613,7 @@ function host(state) {
 function assertProject(open3, wanted) {
   if (!open3) throw new ToolError("Premiere \u0E44\u0E21\u0E48\u0E44\u0E14\u0E49\u0E40\u0E1B\u0E34\u0E14\u0E42\u0E1B\u0E23\u0E40\u0E08\u0E01\u0E15\u0E4C\u0E44\u0E27\u0E49 / no project is open in Premiere: call premiere_open {project}");
   const w = wanted.trim();
-  const hit = /[\\/]/.test(w) ? same2(open3.path, w) : [open3.name, basename12(open3.path)].some((n2) => n2.toLowerCase() === w.toLowerCase() || n2.toLowerCase() === `${w.toLowerCase()}.prproj`);
+  const hit = /[\\/]/.test(w) ? same2(open3.path, w) : [open3.name, basename14(open3.path)].some((n2) => n2.toLowerCase() === w.toLowerCase() || n2.toLowerCase() === `${w.toLowerCase()}.prproj`);
   if (!hit) throw new ToolError(`\u0E42\u0E1B\u0E23\u0E40\u0E08\u0E01\u0E15\u0E4C\u0E17\u0E35\u0E48\u0E40\u0E1B\u0E34\u0E14\u0E43\u0E19 Premiere \u0E44\u0E21\u0E48\u0E15\u0E23\u0E07\u0E01\u0E31\u0E1A\u0E17\u0E35\u0E48\u0E23\u0E30\u0E1A\u0E38 / Premiere has a different project open: call premiere_open with the full path`, { open: open3, wanted: w });
   return open3;
 }
@@ -35926,15 +36648,15 @@ async function callCatCut(state, name, args) {
 }
 async function walk2(dir, out2) {
   for (const e of await readdir8(dir, { withFileTypes: true })) {
-    const full = join18(dir, e.name);
+    const full = join21(dir, e.name);
     if (e.isDirectory()) await walk2(full, out2);
     else if (e.isFile() && MEDIA.has(extname11(e.name).toLowerCase())) out2.push(full);
   }
 }
 function binFor(file, root) {
-  if (!root) return basename12(dirname9(file));
-  const parts = relative4(root, dirname9(file)).split(sep3).filter((p) => p && p !== "." && !CARD_DIRS.test(p));
-  return [basename12(root), ...parts.slice(0, 1)].join("/");
+  if (!root) return basename14(dirname10(file));
+  const parts = relative4(root, dirname10(file)).split(sep3).filter((p) => p && p !== "." && !CARD_DIRS.test(p));
+  return [basename14(root), ...parts.slice(0, 1)].join("/");
 }
 var same2, slug2, MEDIA, CARD_DIRS, isProxyName, PREMIERE_TOOLS;
 var init_tools_premiere = __esm({
@@ -35950,7 +36672,7 @@ var init_tools_premiere = __esm({
     slug2 = (s) => s.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_").trim() || "sequence";
     MEDIA = /* @__PURE__ */ new Set([".mp4", ".mov", ".mxf", ".mts", ".m2ts", ".avi", ".mkv", ".r3d", ".braw", ".crm", ".wav", ".mp3", ".aif", ".aiff", ".m4a", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".psd"]);
     CARD_DIRS = /^(PRIVATE|M4ROOT|CLIP|SUB|THMBNL|AVCHD|BDMV|STREAM|XDROOT|Clip|DCIM|CONTENTS|VIDEO|\d{3}[A-Z_]+)$/i;
-    isProxyName = (f) => /_proxy$/i.test(basename12(f, extname11(f)));
+    isProxyName = (f) => /_proxy$/i.test(basename14(f, extname11(f)));
     PREMIERE_TOOLS = [
       tool({
         name: "premiere_status",
@@ -36040,10 +36762,10 @@ var init_tools_premiere = __esm({
           if (a2.proxyDir) {
             const found = [];
             await walk2(resolve10(a2.proxyDir), found);
-            for (const f of found) if (isProxyName(f)) proxies.set(basename12(f, extname11(f)).replace(/_proxy$/i, "").toLowerCase(), f);
+            for (const f of found) if (isProxyName(f)) proxies.set(basename14(f, extname11(f)).replace(/_proxy$/i, "").toLowerCase(), f);
           }
           const items = files.map((f) => {
-            const proxy = proxies.get(basename12(f.source, extname11(f.source)).toLowerCase());
+            const proxy = proxies.get(basename14(f.source, extname11(f.source)).toLowerCase());
             return { ...f, ...proxy ? { proxy } : {} };
           });
           const { project: project2 } = await ensureProject(state, a2.project);
@@ -36145,7 +36867,7 @@ var init_tools_premiere = __esm({
               hint: "\u0E15\u0E31\u0E14\u0E15\u0E48\u0E2D\u0E43\u0E19 Premiere \u0E44\u0E14\u0E49\u0E40\u0E25\u0E22 \u0E40\u0E2A\u0E23\u0E47\u0E08\u0E41\u0E25\u0E49\u0E27\u0E43\u0E0A\u0E49 premiere_pull \u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E14\u0E36\u0E07\u0E01\u0E25\u0E31\u0E1A / edit in Premiere, then premiere_pull"
             };
           } finally {
-            await rm10(staged, { force: true });
+            await rm11(staged, { force: true });
           }
         }
       }),
@@ -36166,14 +36888,14 @@ var init_tools_premiere = __esm({
           const staged = await stagePath(c3, ".xml");
           try {
             const res = await c3.call("exportXml", { sequence: a2.sequence, path: staged }, { timeoutMs: 18e4 });
-            const dir = join18(state.api.project.projectPaths(p).out, "premiere");
-            await mkdir18(dir, { recursive: true });
-            const xml = uniqueOutputPath(join18(dir, `${slug2(res.sequence.name)}.xml`));
+            const dir = join21(state.api.project.projectPaths(p).out, "premiere");
+            await mkdir19(dir, { recursive: true });
+            const xml = uniqueOutputPath(join21(dir, `${slug2(res.sequence.name)}.xml`));
             await copyFile6(staged, xml, constants9.COPYFILE_EXCL);
             const imported = await callCatCut(state, "import_premiere_xml", { path: xml, apply: a2.apply === true });
             return { ...imported, pulledFrom: { project: res.project, sequence: res.sequence }, xml };
           } finally {
-            await rm10(staged, { force: true });
+            await rm11(staged, { force: true });
           }
         }
       })
@@ -36183,7 +36905,7 @@ var init_tools_premiere = __esm({
 
 // src/mcp/tools-ready.ts
 import { statfs as statfs2 } from "node:fs/promises";
-import os9 from "node:os";
+import os13 from "node:os";
 import { parse as parse5 } from "node:path";
 async function defaultFreeGb(path12) {
   try {
@@ -36219,7 +36941,7 @@ async function readiness(state, deps = {}) {
   else if (d.userAction) apps.push({ app: "premiere", status: "action", keepOpen: d.userAction.keepOpen ? "while-working" : "catcut-opens-it", note: d.note, userAction: act(d.userAction) });
   else apps.push({ app: "premiere", status: "ok", keepOpen: "catcut-opens-it", note: d.ready ? `\u0E40\u0E0A\u0E37\u0E48\u0E2D\u0E21\u0E2D\u0E22\u0E39\u0E48: ${d.status.project?.name ?? "\u0E22\u0E31\u0E07\u0E44\u0E21\u0E48\u0E21\u0E35\u0E42\u0E1B\u0E23\u0E40\u0E08\u0E01\u0E15\u0E4C"}` : "\u0E1B\u0E34\u0E14\u0E2D\u0E22\u0E39\u0E48 \u0E44\u0E21\u0E48\u0E40\u0E1B\u0E47\u0E19\u0E44\u0E23: CatCut \u0E40\u0E1B\u0E34\u0E14\u0E43\u0E2B\u0E49\u0E1E\u0E23\u0E49\u0E2D\u0E21\u0E42\u0E1B\u0E23\u0E40\u0E08\u0E01\u0E15\u0E4C\u0E40\u0E21\u0E37\u0E48\u0E2D\u0E15\u0E49\u0E2D\u0E07\u0E43\u0E0A\u0E49 \u0E41\u0E25\u0E49\u0E27\u0E1A\u0E2D\u0E01\u0E40\u0E21\u0E37\u0E48\u0E2D\u0E1B\u0E34\u0E14\u0E44\u0E14\u0E49" });
   const freeGb = deps.freeGb ?? defaultFreeGb;
-  const paths = [...new Set([state.project?.dir, os9.tmpdir()].filter((p) => !!p).map((p) => parse5(p).root.toUpperCase()))];
+  const paths = [...new Set([state.project?.dir, os13.tmpdir()].filter((p) => !!p).map((p) => parse5(p).root.toUpperCase()))];
   for (const root of paths) {
     const gb = await freeGb(root);
     if (gb === void 0) continue;
@@ -36265,50 +36987,50 @@ var init_tools_ready = __esm({
 
 // src/mcp/tools-premiere-edit.ts
 import { createHash as createHash3 } from "node:crypto";
-import { constants as constants10, existsSync as existsSync20 } from "node:fs";
-import { copyFile as copyFile7, mkdir as mkdir19, readdir as readdir9, rename as rename12, rm as rm11, stat as stat10 } from "node:fs/promises";
-import os10 from "node:os";
-import { basename as basename13, dirname as dirname10, join as join19, resolve as resolve11 } from "node:path";
+import { constants as constants10, existsSync as existsSync22 } from "node:fs";
+import { copyFile as copyFile7, mkdir as mkdir20, readdir as readdir9, rename as rename13, rm as rm12, stat as stat10 } from "node:fs/promises";
+import { basename as basename15, dirname as dirname11, join as join22, resolve as resolve11 } from "node:path";
 function backupDir(projectPath) {
-  const root = join19(process.env["LOCALAPPDATA"] ?? join19(os10.homedir(), "AppData", "Local"), "CatCut", "premiere-backups");
+  const root = join22(localAppDataDir(), "CatCut", "premiere-backups");
   const id = createHash3("sha1").update(resolve11(projectPath).toLowerCase()).digest("hex").slice(0, 8);
-  return join19(root, `${basename13(projectPath, ".prproj").replace(/[^\w.-]+/g, "_")}-${id}`);
+  return join22(root, `${basename15(projectPath, ".prproj").replace(/[^\w.-]+/g, "_")}-${id}`);
 }
 async function checkpoint(state, project2, timeoutMs) {
   await client(state).call("save", { expectProject: project2.path }, { timeoutMs });
   const dir = backupDir(project2.path);
-  await mkdir19(dir, { recursive: true });
-  const file = uniqueOutputPath(join19(dir, `${stampNow()}.prproj`));
+  await mkdir20(dir, { recursive: true });
+  const file = uniqueOutputPath(join22(dir, `${stampNow()}.prproj`));
   await copyFile7(project2.path, file, constants10.COPYFILE_EXCL);
   return file;
 }
 async function latestCheckpoint(projectPath) {
   const dir = backupDir(projectPath);
   const files = (await readdir9(dir).catch(() => [])).filter((f) => /^\d{4}-.*\.prproj$/.test(f) && !f.includes("before-undo") && !f.includes(".used.")).sort();
-  return files.length ? join19(dir, files[files.length - 1]) : void 0;
+  return files.length ? join22(dir, files[files.length - 1]) : void 0;
 }
 async function defaultPreset(premiereExe) {
   if (!premiereExe) return void 0;
   const want = /^Match Source - Adaptive High Bitrate\.epr$/i;
-  const stack = [dirname10(premiereExe)];
+  const stack = [dirname11(premiereExe)];
   for (let budget = 4e3; stack.length && budget > 0; budget--) {
     const d = stack.pop();
     for (const e of await readdir9(d, { withFileTypes: true }).catch(() => [])) {
-      if (e.isDirectory()) stack.push(join19(d, e.name));
-      else if (want.test(e.name)) return join19(d, e.name);
+      if (e.isDirectory()) stack.push(join22(d, e.name));
+      else if (want.test(e.name)) return join22(d, e.name);
     }
   }
   return void 0;
 }
 function outDirFor(state, kind, seq) {
-  const base = state.project ? join19(state.project.dir, "review", kind) : join19(process.env["LOCALAPPDATA"] ?? os10.tmpdir(), "CatCut", kind);
-  return join19(base, `${seq.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_")}-${stampNow()}`);
+  const base = state.project ? join22(state.project.dir, "review", kind) : join22(localAppDataDir(), "CatCut", kind);
+  return join22(base, `${seq.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_")}-${stampNow()}`);
 }
 var frameOrTc, clipSel, source, OP, seqArg, projectArg, timeoutArg, stampNow, PREMIERE_EDIT_TOOLS;
 var init_tools_premiere_edit = __esm({
   "src/mcp/tools-premiere-edit.ts"() {
     "use strict";
     init_zod();
+    init_platform();
     init_aerender();
     init_premiere();
     init_tools_premiere();
@@ -36424,10 +37146,10 @@ var init_tools_premiere_edit = __esm({
           const c3 = client(state);
           const timeoutMs = (a2.timeoutSec ?? 180) * 1e3;
           await c3.call("closeProject", { expectProject: project2.path, save: false }, { timeoutMs });
-          const before = uniqueOutputPath(join19(dirname10(backup), `${stampNow()}-before-undo.prproj`));
+          const before = uniqueOutputPath(join22(dirname11(backup), `${stampNow()}-before-undo.prproj`));
           await copyFile7(target, before, constants10.COPYFILE_EXCL);
           await copyFile7(backup, target);
-          await rename12(backup, backup.replace(/\.prproj$/, ".used.prproj"));
+          await rename13(backup, backup.replace(/\.prproj$/, ".used.prproj"));
           const r = await c3.call("openProject", { path: target }, { timeoutMs });
           return { ok: true, restoredFrom: backup, keptCurrentAs: before, project: r.project, closeHint: closeHint(state, true) };
         }
@@ -36480,7 +37202,7 @@ var init_tools_premiere_edit = __esm({
           const { project: project2 } = await ensureProject(state, a2.project);
           const c3 = client(state);
           const stage = (await stagePath(c3, "")).replace(/[\\/][^\\/]*$/, (m) => `${m}-frames`);
-          await mkdir19(stage, { recursive: true });
+          await mkdir20(stage, { recursive: true });
           try {
             const r = await c3.call("frames", {
               expectProject: project2.path,
@@ -36493,16 +37215,16 @@ var init_tools_premiere_edit = __esm({
               step: a2.step
             }, { timeoutMs: (a2.timeoutSec ?? 300) * 1e3 });
             const dir = outDirFor(state, "premiere-frames", r.sequence.name);
-            await mkdir19(dir, { recursive: true });
-            const frames3 = [];
+            await mkdir20(dir, { recursive: true });
+            const frames4 = [];
             for (const f of r.frames) {
-              const dest = join19(dir, `${String(f.frame).padStart(6, "0")}_${f.tc.replace(/:/g, "-")}.png`);
+              const dest = join22(dir, `${String(f.frame).padStart(6, "0")}_${f.tc.replace(/:/g, "-")}.png`);
               await copyFile7(f.file, dest, constants10.COPYFILE_EXCL);
-              frames3.push({ ...f, file: dest });
+              frames4.push({ ...f, file: dest });
             }
-            return { ok: true, sequence: r.sequence, dir, frames: frames3 };
+            return { ok: true, sequence: r.sequence, dir, frames: frames4 };
           } finally {
-            await rm11(stage, { recursive: true, force: true });
+            await rm12(stage, { recursive: true, force: true });
           }
         }
       }),
@@ -36520,7 +37242,7 @@ var init_tools_premiere_edit = __esm({
         },
         handler: async (a2, state) => {
           const preset = a2.preset ? resolve11(a2.preset) : await defaultPreset(state.env.tools.premiereExe);
-          if (!preset || !existsSync20(preset)) throw new ToolError('\u0E44\u0E21\u0E48\u0E1E\u0E1A preset \u2014 \u0E2A\u0E48\u0E07 preset: "<\u0E44\u0E1F\u0E25\u0E4C .epr>" / no export preset found');
+          if (!preset || !existsSync22(preset)) throw new ToolError('\u0E44\u0E21\u0E48\u0E1E\u0E1A preset \u2014 \u0E2A\u0E48\u0E07 preset: "<\u0E44\u0E1F\u0E25\u0E4C .epr>" / no export preset found');
           const { project: project2 } = await ensureProject(state, a2.project);
           const c3 = client(state);
           const staged = await stagePath(c3, ".mp4");
@@ -36533,12 +37255,12 @@ var init_tools_premiere_edit = __esm({
               preset,
               path: staged
             }, { timeoutMs: (a2.timeoutSec ?? 900) * 1e3 });
-            const dest = a2.out ? uniqueOutputPath(resolve11(a2.out)) : uniqueOutputPath(join19(outDirFor(state, "premiere-exports", r.sequence.name), `${r.from}-${r.to}.mp4`));
-            await mkdir19(dirname10(dest), { recursive: true });
+            const dest = a2.out ? uniqueOutputPath(resolve11(a2.out)) : uniqueOutputPath(join22(outDirFor(state, "premiere-exports", r.sequence.name), `${r.from}-${r.to}.mp4`));
+            await mkdir20(dirname11(dest), { recursive: true });
             await copyFile7(staged, dest, constants10.COPYFILE_EXCL);
             return { ok: true, sequence: r.sequence, from: r.from, to: r.to, path: dest, bytes: (await stat10(dest)).size, preset };
           } finally {
-            await rm11(staged, { force: true });
+            await rm12(staged, { force: true });
           }
         }
       }),
@@ -36562,6 +37284,450 @@ var init_tools_premiere_edit = __esm({
   }
 });
 
+// src/engine/jumpcut.ts
+function parseSilences(stderr, totalSec) {
+  const out2 = [];
+  let open3;
+  for (const line of stderr.split(/\r?\n/)) {
+    const s = /silence_start:\s*(-?[\d.]+)/.exec(line);
+    if (s) {
+      open3 = Math.max(0, Number(s[1]));
+      continue;
+    }
+    const e = /silence_end:\s*([\d.]+)/.exec(line);
+    if (e && open3 !== void 0) {
+      out2.push({ startSec: open3, endSec: Number(e[1]) });
+      open3 = void 0;
+    }
+  }
+  if (open3 !== void 0 && open3 < totalSec) out2.push({ startSec: open3, endSec: totalSec });
+  return out2;
+}
+async function detectSilences(tools, file, fromSec, durSec, o2 = {}) {
+  const noise = o2.noiseDb ?? -35;
+  const d = (o2.minSilenceMs ?? 350) / 1e3;
+  const r = await execa(tools.ffmpeg, [
+    "-hide_banner",
+    "-nostdin",
+    "-ss",
+    fromSec.toFixed(6),
+    "-t",
+    durSec.toFixed(6),
+    "-i",
+    file,
+    "-map",
+    "0:a:0",
+    "-vn",
+    "-af",
+    `silencedetect=noise=${noise}dB:d=${d}`,
+    "-f",
+    "null",
+    "-"
+  ], { reject: false, windowsHide: true, timeout: Math.max(12e4, durSec * 2e3), cancelSignal: o2.signal });
+  if (r.exitCode !== 0) throw new Error(`ffmpeg silencedetect failed on ${file}: ${String(r.stderr ?? "").trim().slice(-300)}`);
+  return parseSilences(String(r.stderr ?? ""), durSec);
+}
+function speechRanges(silences, durFrames, fps, o2 = {}) {
+  const pad = (o2.padMs ?? 80) / 1e3 * fps;
+  const minPiece = (o2.minPieceMs ?? 200) / 1e3 * fps;
+  const ranges = [];
+  let pos = 0;
+  for (const s of [...silences].sort((a2, b) => a2.startSec - b.startSec)) {
+    const a2 = s.startSec * fps;
+    const b = s.endSec * fps;
+    if (a2 > pos) ranges.push([pos, a2]);
+    pos = Math.max(pos, b);
+  }
+  if (pos < durFrames) ranges.push([pos, durFrames]);
+  const out2 = [];
+  for (const [a2, b] of ranges) {
+    if (b - a2 < minPiece) continue;
+    const s = Math.max(0, Math.floor(a2 - pad));
+    const e = Math.min(durFrames, Math.ceil(b + pad));
+    const last = out2[out2.length - 1];
+    if (last && s <= last[1]) last[1] = Math.max(last[1], e);
+    else out2.push([s, e]);
+  }
+  return out2;
+}
+function splitClip(clip, ranges, taken) {
+  if (!ranges.length) return [];
+  if (ranges.length === 1 && ranges[0][0] === 0 && ranges[0][1] === clip.dur) return [clip];
+  return ranges.map(([a2, b], i2) => {
+    let id = `${clip.id}_j${i2 + 1}`;
+    for (let n2 = 2; taken.has(id); n2++) id = `${clip.id}_j${i2 + 1}_${n2}`;
+    taken.add(id);
+    const piece = { ...clip, id, in: clip.in + a2, dur: b - a2 };
+    if (i2 > 0) {
+      delete piece.marker;
+      delete piece.slot;
+    }
+    return piece;
+  });
+}
+function applySplits(t, pieces) {
+  const next = structuredClone(t);
+  next.video = t.video.flatMap((c3) => pieces.get(c3.id) ?? [c3]);
+  next.cuts = t.cuts.flatMap((cut) => {
+    const p = pieces.get(cut.after);
+    if (!p) return [cut];
+    if (!p.length) return [];
+    return [{ ...cut, after: p[p.length - 1].id }];
+  });
+  return next;
+}
+var init_jumpcut = __esm({
+  "src/engine/jumpcut.ts"() {
+    "use strict";
+    init_execa();
+  }
+});
+
+// src/mcp/tools-reels.ts
+import { mkdir as mkdir21, writeFile as writeFile15 } from "node:fs/promises";
+import { join as join23 } from "node:path";
+async function backupTimeline4(p, reason) {
+  const dir = join23(p.dir, "history");
+  await mkdir21(dir, { recursive: true });
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const body2 = `${JSON.stringify({ savedAt: now, reason, timeline: p.timeline }, null, 2)}
+`;
+  for (let n2 = 1; ; n2++) {
+    const file = join23(dir, `timeline-${now.replace(/[:.]/g, "-")}-${n2}.json`);
+    try {
+      await writeFile15(file, body2, { encoding: "utf8", flag: "wx" });
+      return file;
+    } catch (e) {
+      if (e.code !== "EEXIST") throw e;
+    }
+  }
+}
+async function applyTimeline(state, p, next, reason) {
+  const backup = await backupTimeline4(p, reason);
+  const prev = p.timeline;
+  state.api.project.setTimeline(p, next);
+  const errors = state.api.project.validateTimeline(p);
+  if (errors.length) {
+    state.api.project.setTimeline(p, prev);
+    throw new ToolError(`\u0E44\u0E17\u0E21\u0E4C\u0E44\u0E25\u0E19\u0E4C\u0E43\u0E2B\u0E21\u0E48\u0E44\u0E21\u0E48\u0E1C\u0E48\u0E32\u0E19\u0E01\u0E32\u0E23\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A \u0E44\u0E21\u0E48\u0E44\u0E14\u0E49\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01 / timeline invalid, not applied`, { errors, backup });
+  }
+  await state.api.project.saveProject(p);
+  return backup;
+}
+function clipsById(p, ids) {
+  if (!ids) return p.timeline.video;
+  const unknown2 = ids.filter((id) => !p.timeline.video.some((c3) => c3.id === id));
+  if (unknown2.length) throw new ToolError(`\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E04\u0E25\u0E34\u0E1B / unknown clips: ${unknown2.join(", ")}`, { unknown: unknown2 });
+  return p.timeline.video.filter((c3) => ids.includes(c3.id));
+}
+var WAIT_MS4, frames2, hex, UNDO, REELS_TOOLS;
+var init_tools_reels = __esm({
+  "src/mcp/tools-reels.ts"() {
+    "use strict";
+    init_zod();
+    init_timecode();
+    init_captions();
+    init_jumpcut();
+    init_transcribe();
+    init_state();
+    init_tooldef();
+    WAIT_MS4 = 2e4;
+    frames2 = external_exports.number().int();
+    hex = external_exports.string().regex(/^#?[0-9a-fA-F]{6}$/, "#RRGGBB");
+    UNDO = "\u0E22\u0E49\u0E2D\u0E19\u0E01\u0E25\u0E31\u0E1A\u0E44\u0E14\u0E49\u0E14\u0E49\u0E27\u0E22 timeline_restore / undo with timeline_restore";
+    REELS_TOOLS = [
+      tool({
+        name: "transcribe",
+        description: "\u0E16\u0E2D\u0E14\u0E40\u0E2A\u0E35\u0E22\u0E07\u0E1E\u0E39\u0E14\u0E40\u0E1B\u0E47\u0E19\u0E04\u0E33\u0E1E\u0E23\u0E49\u0E2D\u0E21\u0E40\u0E27\u0E25\u0E32 (whisper.cpp \u0E43\u0E19\u0E40\u0E04\u0E23\u0E37\u0E48\u0E2D\u0E07 \u0E44\u0E21\u0E48\u0E2A\u0E48\u0E07\u0E44\u0E1F\u0E25\u0E4C\u0E2D\u0E2D\u0E01\u0E19\u0E2D\u0E01\u0E40\u0E04\u0E23\u0E37\u0E48\u0E2D\u0E07) \u0E40\u0E01\u0E47\u0E1A cache \u0E44\u0E27\u0E49\u0E43\u0E0A\u0E49\u0E17\u0E33\u0E0B\u0E31\u0E1A: \u0E04\u0E48\u0E32\u0E40\u0E23\u0E34\u0E48\u0E21\u0E15\u0E49\u0E19 = \u0E41\u0E2B\u0E25\u0E48\u0E07\u0E40\u0E2A\u0E35\u0E22\u0E07\u0E17\u0E35\u0E48\u0E0B\u0E31\u0E1A\u0E43\u0E0A\u0E49 (VO \u0E16\u0E49\u0E32\u0E21\u0E35 \u0E44\u0E21\u0E48\u0E07\u0E31\u0E49\u0E19\u0E40\u0E2A\u0E35\u0E22\u0E07\u0E01\u0E25\u0E49\u0E2D\u0E07\u0E02\u0E2D\u0E07\u0E04\u0E25\u0E34\u0E1B\u0E1A\u0E19\u0E44\u0E17\u0E21\u0E4C\u0E44\u0E25\u0E19\u0E4C); \u0E07\u0E32\u0E19\u0E22\u0E32\u0E27\u0E04\u0E37\u0E19 jobId \xB7 Transcribe speech to timed words (local whisper.cpp), cached for captions",
+        input: {
+          assets: external_exports.array(external_exports.string()).optional().describe("asset ids; default: what the captions use"),
+          lang: external_exports.string().optional().describe("'th', 'en', \u2026 or 'auto'; default captions.lang or auto"),
+          wait: external_exports.boolean().optional().describe("false: return the job id at once")
+        },
+        writesProject: true,
+        handler: async (a2, state) => {
+          const p = requireProject(state);
+          requireFfmpeg(state);
+          const w = findWhisper();
+          if (!w.cli || !w.model) {
+            throw new ToolError("\u0E22\u0E31\u0E07\u0E44\u0E21\u0E48\u0E21\u0E35 whisper \u2014 \u0E15\u0E34\u0E14\u0E15\u0E31\u0E49\u0E07 whisper.cpp \u0E41\u0E25\u0E30\u0E42\u0E21\u0E40\u0E14\u0E25\u0E01\u0E48\u0E2D\u0E19 / whisper.cpp or its model is missing", {
+              cli: w.cli ?? null,
+              model: w.model ?? null,
+              modelsDir: modelsDir(),
+              hint: process.platform === "darwin" ? "brew install ffmpeg-full (\u0E21\u0E35 whisper-cli \u0E21\u0E32\u0E14\u0E49\u0E27\u0E22) \u0E41\u0E25\u0E49\u0E27\u0E42\u0E2B\u0E25\u0E14 ggml-large-v3-turbo-q5_0.bin \u0E44\u0E27\u0E49\u0E43\u0E19 modelsDir" : "\u0E15\u0E34\u0E14\u0E15\u0E31\u0E49\u0E07 whisper.cpp (whisper-cli) \u0E41\u0E25\u0E49\u0E27\u0E27\u0E32\u0E07\u0E42\u0E21\u0E40\u0E14\u0E25 ggml-*.bin \u0E43\u0E19 modelsDir \u0E2B\u0E23\u0E37\u0E2D\u0E01\u0E33\u0E2B\u0E19\u0E14 EDITMCP_WHISPER_CLI / EDITMCP_WHISPER_MODEL"
+            });
+          }
+          const ids = a2.assets ?? captionAssets(p);
+          if (!ids.length) throw new ToolError("\u0E44\u0E21\u0E48\u0E21\u0E35\u0E04\u0E25\u0E34\u0E1B\u0E40\u0E2A\u0E35\u0E22\u0E07\u0E43\u0E2B\u0E49\u0E16\u0E2D\u0E14 / nothing to transcribe (no clips or VO on the timeline)");
+          const files = ids.map((id) => {
+            const asset = p.assets[id];
+            if (!asset) throw new ToolError(`\u0E44\u0E21\u0E48\u0E1E\u0E1A asset / unknown asset: ${id}`);
+            if (asset.kind === "aecomp" || asset.kind === "still") throw new ToolError(`asset \u0E44\u0E21\u0E48\u0E21\u0E35\u0E40\u0E2A\u0E35\u0E22\u0E07\u0E1E\u0E39\u0E14 / ${id} has no speech (${asset.kind})`);
+            return { id, path: asset.path };
+          });
+          const lang = a2.lang ?? p.captions?.lang;
+          const job = state.jobs.start("transcribe", async (ctx) => {
+            const out2 = [];
+            for (const [i2, f] of files.entries()) {
+              ctx.progress({ stage: "transcribe", done: i2, total: files.length, message: f.id });
+              const t = await cachedTranscript(state.env.tools, transcriptsDir(p), f.path, { ...lang ? { lang } : {}, signal: ctx.signal, whisper: w });
+              out2.push({ asset: f.id, cached: t.cached, lang: t.lang, model: t.model, words: t.words.length, text: t.text.length > 1500 ? `${t.text.slice(0, 1500)}\u2026` : t.text });
+            }
+            ctx.progress({ stage: "transcribe", done: files.length, total: files.length });
+            return {
+              ok: true,
+              transcripts: out2,
+              hint: "\u0E15\u0E23\u0E27\u0E08\u0E04\u0E33\u0E1C\u0E34\u0E14 (\u0E0A\u0E37\u0E48\u0E2D\u0E41\u0E1A\u0E23\u0E19\u0E14\u0E4C/\u0E28\u0E31\u0E1E\u0E17\u0E4C\u0E2D\u0E31\u0E07\u0E01\u0E24\u0E29) \u0E41\u0E25\u0E49\u0E27\u0E41\u0E01\u0E49\u0E14\u0E49\u0E27\u0E22 captions_set {fixes:[{from,to}]}; \u0E14\u0E39\u0E0B\u0E31\u0E1A\u0E14\u0E49\u0E27\u0E22 captions_plan / fix misheard words with captions_set {fixes}"
+            };
+          });
+          if (a2.wait === false) return { ok: true, jobId: job.id, pending: true };
+          let timer;
+          const info = await Promise.race([state.jobs.wait(job.id), new Promise((r) => {
+            timer = setTimeout(() => r(void 0), WAIT_MS4);
+          })]);
+          clearTimeout(timer);
+          if (!info) return { ok: true, jobId: job.id, pending: true, hint: "\u0E22\u0E31\u0E07\u0E16\u0E2D\u0E14\u0E40\u0E2A\u0E35\u0E22\u0E07\u0E2D\u0E22\u0E39\u0E48 \u2014 \u0E23\u0E2D\u0E1C\u0E25\u0E14\u0E49\u0E27\u0E22 job_wait {id} / still running: job_wait {id}" };
+          if (info.status === "done") return { ...info.result, jobId: job.id };
+          throw new ToolError(info.error ?? `transcribe ${info.status}`, { jobId: job.id });
+        }
+      }),
+      tool({
+        name: "captions_set",
+        description: "\u0E15\u0E31\u0E49\u0E07\u0E04\u0E48\u0E32\u0E0B\u0E31\u0E1A\u0E2D\u0E31\u0E15\u0E42\u0E19\u0E21\u0E31\u0E15\u0E34 (\u0E2A\u0E44\u0E15\u0E25\u0E4C Reels/TikTok) \u0E17\u0E35\u0E48\u0E40\u0E1C\u0E32\u0E25\u0E07\u0E44\u0E1F\u0E25\u0E4C\u0E2A\u0E48\u0E07\u0E07\u0E32\u0E19\u0E15\u0E2D\u0E19 deliver (master ProRes \u0E44\u0E21\u0E48\u0E21\u0E35\u0E0B\u0E31\u0E1A): enabled, style pop (\u0E44\u0E2E\u0E44\u0E25\u0E15\u0E4C\u0E17\u0E35\u0E25\u0E30\u0E04\u0E33) | clean, position, font, \u0E2A\u0E35, \u0E02\u0E19\u0E32\u0E14, \u0E04\u0E33\u0E41\u0E01\u0E49 (fixes) \u0E41\u0E25\u0E30 targets \xB7 Configure burned-in auto captions (merged into the current settings)",
+        input: {
+          enabled: external_exports.boolean().optional(),
+          source: external_exports.enum(["auto", "clips", "vo"]).optional().describe("speech of the video clips or of the VO track; auto = VO when present"),
+          lang: external_exports.string().optional(),
+          style: external_exports.enum(["pop", "clean"]).optional(),
+          position: external_exports.enum(["bottom", "middle", "top"]).optional().describe("default: middle on vertical video, bottom otherwise"),
+          font: external_exports.string().optional().describe('installed font family with Thai glyphs, e.g. "Kanit", "Prompt"'),
+          fontScale: external_exports.number().min(0.3).max(3).optional(),
+          color: hex.optional(),
+          highlight: hex.optional().describe("colour of the word being spoken (pop)"),
+          uppercase: external_exports.boolean().optional(),
+          maxWords: external_exports.number().int().min(1).max(12).optional(),
+          maxChars: external_exports.number().int().min(4).max(60).optional(),
+          fixes: external_exports.array(external_exports.object({ from: external_exports.string().min(1), to: external_exports.string() })).optional().describe("replaces the whole fix list"),
+          targets: external_exports.array(external_exports.string()).optional().describe("delivery targets that get captions; default all except th_tv, th_prores, m422hq")
+        },
+        mutating: true,
+        writesProject: true,
+        handler: async (a2, state) => {
+          const p = requireProject(state);
+          const next = { ...p.captions ?? { enabled: false } };
+          for (const [k, v] of Object.entries(a2)) if (v !== void 0) next[k] = v;
+          if (a2.enabled === void 0 && !p.captions) next.enabled = true;
+          p.captions = next;
+          await state.api.project.saveProject(p);
+          return {
+            ok: true,
+            captions: p.captions,
+            source: captionSource(p),
+            assets: captionAssets(p),
+            hint: "\u0E14\u0E39\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E41\u0E25\u0E30\u0E40\u0E27\u0E25\u0E32\u0E14\u0E49\u0E27\u0E22 captions_plan; \u0E0B\u0E31\u0E1A\u0E08\u0E30\u0E02\u0E36\u0E49\u0E19\u0E40\u0E21\u0E37\u0E48\u0E2D deliver / preview with captions_plan; burned in on deliver"
+          };
+        }
+      }),
+      tool({
+        name: "captions_plan",
+        description: "\u0E14\u0E39\u0E0B\u0E31\u0E1A\u0E17\u0E35\u0E48\u0E08\u0E30\u0E02\u0E36\u0E49\u0E19\u0E08\u0E23\u0E34\u0E07\u0E15\u0E32\u0E21\u0E44\u0E17\u0E21\u0E4C\u0E44\u0E25\u0E19\u0E4C\u0E1B\u0E31\u0E08\u0E08\u0E38\u0E1A\u0E31\u0E19 (\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21 + timecode) \u0E08\u0E32\u0E01 transcript \u0E43\u0E19 cache \u0E43\u0E0A\u0E49\u0E15\u0E23\u0E27\u0E08\u0E04\u0E33\u0E1C\u0E34\u0E14\u0E01\u0E48\u0E2D\u0E19 deliver; \u0E44\u0E21\u0E48\u0E16\u0E2D\u0E14\u0E40\u0E2A\u0E35\u0E22\u0E07\u0E40\u0E2D\u0E07 \xB7 List the captions as they will appear (from cached transcripts)",
+        input: { limit: external_exports.number().int().min(1).max(500).optional() },
+        handler: async (a2, state) => {
+          const p = requireProject(state);
+          const c3 = p.captions;
+          const missing = [];
+          const words = await projectWords(p, state.env.tools, transcriptsDir(p), { cacheOnly: true, missing });
+          const fps = p.meta.fps;
+          const caps = chunkWords(placeWords(p, words), fps, { ...c3?.maxWords ? { maxWords: c3.maxWords } : {}, ...c3?.maxChars ? { maxChars: c3.maxChars } : {} });
+          const limit = a2.limit ?? 120;
+          return {
+            ok: true,
+            enabled: !!c3?.enabled,
+            source: captionSource(p),
+            count: caps.length,
+            captions: caps.slice(0, limit).map((x) => ({ start: x.start, tc: framesToTc(x.start, fps), dur: x.end - x.start, text: joinWords(x.words.map((w) => w.text)) })),
+            texts: c3?.texts ?? [],
+            ...missing.length ? { missing, hint: `\u0E22\u0E31\u0E07\u0E44\u0E21\u0E48\u0E44\u0E14\u0E49\u0E16\u0E2D\u0E14\u0E40\u0E2A\u0E35\u0E22\u0E07: ${missing.join(", ")} \u2014 \u0E40\u0E23\u0E35\u0E22\u0E01 transcribe \u0E01\u0E48\u0E2D\u0E19 / not transcribed yet: call transcribe` } : {},
+            ...!c3?.enabled ? { note: "\u0E0B\u0E31\u0E1A\u0E22\u0E31\u0E07\u0E1B\u0E34\u0E14\u0E2D\u0E22\u0E39\u0E48 \u0E40\u0E1B\u0E34\u0E14\u0E14\u0E49\u0E27\u0E22 captions_set {enabled:true} / captions are off" } : {}
+          };
+        }
+      }),
+      tool({
+        name: "text_add",
+        description: "\u0E43\u0E2A\u0E48\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E1A\u0E19\u0E20\u0E32\u0E1E (\u0E40\u0E1C\u0E32\u0E25\u0E07\u0E44\u0E1F\u0E25\u0E4C\u0E2A\u0E48\u0E07\u0E07\u0E32\u0E19): style hook = \u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E43\u0E2B\u0E0D\u0E48\u0E14\u0E49\u0E32\u0E19\u0E1A\u0E19\u0E0A\u0E48\u0E27\u0E07\u0E15\u0E49\u0E19\u0E04\u0E25\u0E34\u0E1B (\u0E2E\u0E38\u0E01 2-3 \u0E27\u0E34\u0E41\u0E23\u0E01), title = \u0E01\u0E25\u0E32\u0E07\u0E08\u0E2D, lower = \u0E21\u0E38\u0E21\u0E25\u0E48\u0E32\u0E07; at/dur \u0E40\u0E1B\u0E47\u0E19\u0E40\u0E1F\u0E23\u0E21 \xB7 Add an on-screen text overlay (hook/title/lower)",
+        input: {
+          text: external_exports.string().min(1).describe("\\n for a line break"),
+          at: frames2.min(0).optional().describe("default 0"),
+          dur: frames2.min(1).optional().describe("default 3 s"),
+          style: external_exports.enum(["hook", "title", "lower"]).optional().describe("default hook"),
+          id: external_exports.string().optional()
+        },
+        mutating: true,
+        writesProject: true,
+        handler: async (a2, state) => {
+          const p = requireProject(state);
+          const c3 = p.captions ?? { enabled: false };
+          const texts = [...c3.texts ?? []];
+          let id = a2.id ?? `t${texts.length + 1}`;
+          for (let n2 = texts.length + 2; !a2.id && texts.some((t) => t.id === id); n2++) id = `t${n2}`;
+          if (texts.some((t) => t.id === id)) throw new ToolError(`id \u0E0B\u0E49\u0E33 / duplicate text id: ${id}`);
+          texts.push({ id, text: a2.text, at: a2.at ?? 0, dur: a2.dur ?? Math.round(p.meta.fps * 3), style: a2.style ?? "hook" });
+          p.captions = { ...c3, texts };
+          await state.api.project.saveProject(p);
+          return { ok: true, texts, hint: "\u0E02\u0E36\u0E49\u0E19\u0E43\u0E19\u0E44\u0E1F\u0E25\u0E4C deliver (\u0E44\u0E21\u0E48\u0E43\u0E0A\u0E48 master) / burned into deliverables" };
+        }
+      }),
+      tool({
+        name: "text_remove",
+        description: "\u0E25\u0E1A\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E1A\u0E19\u0E20\u0E32\u0E1E\u0E15\u0E32\u0E21 id \xB7 Remove a text overlay",
+        input: { id: external_exports.string() },
+        mutating: true,
+        writesProject: true,
+        handler: async (a2, state) => {
+          const p = requireProject(state);
+          const texts = p.captions?.texts ?? [];
+          if (!texts.some((t) => t.id === a2.id)) throw new ToolError(`\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21 / unknown text id: ${a2.id}`, { ids: texts.map((t) => t.id) });
+          p.captions = { ...p.captions, texts: texts.filter((t) => t.id !== a2.id) };
+          await state.api.project.saveProject(p);
+          return { ok: true, texts: p.captions.texts };
+        }
+      }),
+      tool({
+        name: "jumpcut",
+        description: "\u0E15\u0E31\u0E14\u0E0A\u0E48\u0E27\u0E07\u0E40\u0E07\u0E35\u0E22\u0E1A/\u0E2B\u0E22\u0E38\u0E14\u0E1E\u0E39\u0E14\u0E2D\u0E2D\u0E01 (jump cut \u0E2A\u0E44\u0E15\u0E25\u0E4C Reels) \u0E08\u0E32\u0E01\u0E40\u0E2A\u0E35\u0E22\u0E07\u0E02\u0E2D\u0E07\u0E04\u0E25\u0E34\u0E1B\u0E40\u0E2D\u0E07: \u0E41\u0E1A\u0E48\u0E07\u0E04\u0E25\u0E34\u0E1B\u0E40\u0E1B\u0E47\u0E19\u0E17\u0E48\u0E2D\u0E19\u0E17\u0E35\u0E48\u0E21\u0E35\u0E40\u0E2A\u0E35\u0E22\u0E07\u0E1E\u0E39\u0E14 (<id>_j1, _j2\u2026); \u0E04\u0E48\u0E32\u0E40\u0E23\u0E34\u0E48\u0E21\u0E15\u0E49\u0E19\u0E17\u0E38\u0E01\u0E04\u0E25\u0E34\u0E1B\u0E17\u0E35\u0E48\u0E21\u0E35\u0E40\u0E2A\u0E35\u0E22\u0E07\u0E41\u0E25\u0E30\u0E44\u0E21\u0E48\u0E44\u0E14\u0E49\u0E40\u0E1B\u0E25\u0E35\u0E48\u0E22\u0E19\u0E04\u0E27\u0E32\u0E21\u0E40\u0E23\u0E47\u0E27; dry run \u0E01\u0E48\u0E2D\u0E19, apply: true \u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E43\u0E0A\u0E49 (\u0E2A\u0E33\u0E23\u0E2D\u0E07\u0E44\u0E17\u0E21\u0E4C\u0E44\u0E25\u0E19\u0E4C\u0E01\u0E48\u0E2D\u0E19) \xB7 Cut out pauses in talking-head clips",
+        input: {
+          clips: external_exports.array(external_exports.string()).optional(),
+          noiseDb: external_exports.number().min(-80).max(-10).optional().describe("silence threshold, default -35 (raise to -30 for noisy rooms)"),
+          minSilenceMs: external_exports.number().int().min(100).max(5e3).optional().describe("shorter pauses stay; default 350"),
+          padMs: external_exports.number().int().min(0).max(1e3).optional().describe("speech kept around each cut; default 80"),
+          minPieceMs: external_exports.number().int().min(0).max(5e3).optional().describe("drop speech bits shorter than this; default 200"),
+          apply: external_exports.boolean().optional()
+        },
+        mutating: true,
+        writesProject: true,
+        handler: async (a2, state) => {
+          const p = requireProject(state);
+          requireFfmpeg(state);
+          const fps = p.meta.fps;
+          const opts = {
+            ...a2.noiseDb !== void 0 ? { noiseDb: a2.noiseDb } : {},
+            ...a2.minSilenceMs !== void 0 ? { minSilenceMs: a2.minSilenceMs } : {},
+            ...a2.padMs !== void 0 ? { padMs: a2.padMs } : {},
+            ...a2.minPieceMs !== void 0 ? { minPieceMs: a2.minPieceMs } : {}
+          };
+          const taken = new Set(p.timeline.video.map((c3) => c3.id));
+          const pieces = /* @__PURE__ */ new Map();
+          const report2 = [];
+          const skipped = [];
+          for (const clip of clipsById(p, a2.clips)) {
+            const asset = p.assets[clip.src];
+            if (!asset || asset.kind === "aecomp" || asset.kind === "still") {
+              skipped.push({ clip: clip.id, reason: "no audio (AE comp / still)" });
+              continue;
+            }
+            if (asset.probe && !asset.probe.hasAudio) {
+              skipped.push({ clip: clip.id, reason: "source has no audio" });
+              continue;
+            }
+            if (clip.speed) {
+              skipped.push({ clip: clip.id, reason: "speed-changed clip" });
+              continue;
+            }
+            const silences = await detectSilences(state.env.tools, asset.path, clip.in / fps, clip.dur / fps, opts);
+            const ranges = speechRanges(silences, clip.dur, fps, opts);
+            if (!ranges.length) {
+              skipped.push({ clip: clip.id, reason: "no speech found (kept as is; lower noiseDb if it has quiet speech)" });
+              continue;
+            }
+            const parts = splitClip(clip, ranges, taken);
+            if (parts.length === 1 && parts[0] === clip) continue;
+            pieces.set(clip.id, parts);
+            const kept = parts.reduce((n2, c3) => n2 + c3.dur, 0);
+            report2.push({ clip: clip.id, pieces: parts.length, before: clip.dur, after: kept, removed: clip.dur - kept, removedSec: Math.round((clip.dur - kept) / fps * 10) / 10 });
+          }
+          const removed = report2.reduce((n2, r) => n2 + r["removed"], 0);
+          const base = { clips: report2, skipped, removedFrames: removed, removedTc: framesToTc(removed, fps) };
+          if (!a2.apply || !pieces.size) {
+            return { ok: true, applied: false, ...base, ...pieces.size ? { next: "\u0E15\u0E23\u0E27\u0E08\u0E41\u0E25\u0E49\u0E27\u0E40\u0E23\u0E35\u0E22\u0E01\u0E0B\u0E49\u0E33\u0E14\u0E49\u0E27\u0E22 apply: true / call again with apply: true" } : { note: "\u0E44\u0E21\u0E48\u0E21\u0E35\u0E0A\u0E48\u0E27\u0E07\u0E40\u0E07\u0E35\u0E22\u0E1A\u0E43\u0E2B\u0E49\u0E15\u0E31\u0E14 / nothing to cut" } };
+          }
+          const backup = await applyTimeline(state, p, applySplits(p.timeline, pieces), `before jumpcut (${pieces.size} clips)`);
+          return { ok: true, applied: true, backup, ...base, hint: `\u0E15\u0E48\u0E2D\u0E14\u0E49\u0E27\u0E22 punch_in \u0E43\u0E2B\u0E49\u0E41\u0E15\u0E48\u0E25\u0E30\u0E17\u0E48\u0E2D\u0E19\u0E2A\u0E25\u0E31\u0E1A\u0E0B\u0E39\u0E21; ${UNDO}` };
+        }
+      }),
+      tool({
+        name: "punch_in",
+        description: "\u0E0B\u0E39\u0E21\u0E01\u0E23\u0E30\u0E41\u0E17\u0E01 (punch-in) \u0E2A\u0E44\u0E15\u0E25\u0E4C Reels: \u0E17\u0E48\u0E2D\u0E19\u0E17\u0E35\u0E48\u0E15\u0E48\u0E2D\u0E01\u0E31\u0E19\u0E08\u0E32\u0E01\u0E44\u0E1F\u0E25\u0E4C\u0E40\u0E14\u0E35\u0E22\u0E27\u0E01\u0E31\u0E19 (\u0E40\u0E0A\u0E48\u0E19\u0E2B\u0E25\u0E31\u0E07 jumpcut) \u0E2A\u0E25\u0E31\u0E1A 100% \u2194 scale%; pattern all = \u0E17\u0E38\u0E01\u0E04\u0E25\u0E34\u0E1B\u0E17\u0E35\u0E48\u0E40\u0E25\u0E37\u0E2D\u0E01; dry run \u0E01\u0E48\u0E2D\u0E19, apply: true \u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E43\u0E0A\u0E49 \xB7 Alternate zoom on consecutive pieces of the same source",
+        input: {
+          scale: external_exports.number().min(101).max(200).optional().describe("zoomed size in percent; default 115"),
+          pattern: external_exports.enum(["alternate", "all"]).optional().describe("default alternate"),
+          clips: external_exports.array(external_exports.string()).optional(),
+          apply: external_exports.boolean().optional()
+        },
+        mutating: true,
+        writesProject: true,
+        handler: async (a2, state) => {
+          const p = requireProject(state);
+          const zoom = a2.scale ?? 115;
+          const pick2 = new Set(clipsById(p, a2.clips).map((c3) => c3.id));
+          const next = structuredClone(p.timeline);
+          const changes = [];
+          let run6 = 0;
+          next.video.forEach((c3, i2) => {
+            const prev = next.video[i2 - 1];
+            run6 = prev && prev.src === c3.src ? run6 + 1 : 0;
+            if (!pick2.has(c3.id)) return;
+            const want = (a2.pattern ?? "alternate") === "all" || run6 % 2 === 1 ? zoom : 100;
+            const was = c3.scale ?? 100;
+            if (want === was) return;
+            if (want === 100) delete c3.scale;
+            else c3.scale = want;
+            changes.push({ clip: c3.id, from: was, to: want });
+          });
+          if (!a2.apply || !changes.length) {
+            return { ok: true, applied: false, changes, ...changes.length ? { next: "apply: true \u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E43\u0E0A\u0E49 / call again with apply: true" } : { note: "\u0E44\u0E21\u0E48\u0E21\u0E35\u0E2D\u0E30\u0E44\u0E23\u0E40\u0E1B\u0E25\u0E35\u0E48\u0E22\u0E19 / nothing to change" } };
+          }
+          const backup = await applyTimeline(state, p, next, `before punch_in ${zoom}%`);
+          return { ok: true, applied: true, backup, changes, hint: UNDO };
+        }
+      }),
+      tool({
+        name: "sfx_on_cuts",
+        description: "\u0E27\u0E32\u0E07\u0E40\u0E2A\u0E35\u0E22\u0E07\u0E40\u0E2D\u0E1F\u0E40\u0E1F\u0E01\u0E15\u0E4C (whoosh/pop) \u0E17\u0E35\u0E48\u0E23\u0E2D\u0E22\u0E15\u0E31\u0E14: cuts source-change = \u0E40\u0E09\u0E1E\u0E32\u0E30\u0E15\u0E2D\u0E19\u0E40\u0E1B\u0E25\u0E35\u0E48\u0E22\u0E19\u0E44\u0E1F\u0E25\u0E4C (\u0E04\u0E48\u0E32\u0E40\u0E23\u0E34\u0E48\u0E21\u0E15\u0E49\u0E19), all = \u0E17\u0E38\u0E01\u0E23\u0E2D\u0E22\u0E15\u0E31\u0E14\u0E23\u0E27\u0E21 jump cut; \u0E2B\u0E25\u0E32\u0E22\u0E44\u0E1F\u0E25\u0E4C\u0E08\u0E30\u0E27\u0E19\u0E43\u0E0A\u0E49; \u0E41\u0E17\u0E19\u0E17\u0E35\u0E48\u0E0A\u0E38\u0E14\u0E40\u0E14\u0E34\u0E21\u0E17\u0E35\u0E48\u0E40\u0E04\u0E23\u0E37\u0E48\u0E2D\u0E07\u0E21\u0E37\u0E2D\u0E19\u0E35\u0E49\u0E27\u0E32\u0E07\u0E44\u0E27\u0E49 (id sfx_auto_*); dry run \u0E01\u0E48\u0E2D\u0E19 \xB7 Place SFX on cuts (replaces earlier auto SFX)",
+        input: {
+          srcs: external_exports.array(external_exports.string()).min(1).describe("audio asset ids (whoosh, pop, click\u2026), used in turn"),
+          cuts: external_exports.enum(["source-change", "all"]).optional(),
+          gainDb: external_exports.number().min(-40).max(6).optional().describe("default -8"),
+          offset: frames2.optional().describe("frames relative to the cut; default -2 (the whoosh lands on the cut)"),
+          apply: external_exports.boolean().optional()
+        },
+        mutating: true,
+        writesProject: true,
+        handler: async (a2, state) => {
+          const p = requireProject(state);
+          for (const id of a2.srcs) if (!p.assets[id]) throw new ToolError(`\u0E44\u0E21\u0E48\u0E1E\u0E1A asset / unknown asset: ${id} (\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E44\u0E1F\u0E25\u0E4C\u0E40\u0E2A\u0E35\u0E22\u0E07\u0E14\u0E49\u0E27\u0E22 asset_add \u0E01\u0E48\u0E2D\u0E19)`);
+          const starts = state.api.project.clipStartFrames(p);
+          const v = p.timeline.video;
+          const at = [];
+          for (let i2 = 1; i2 < v.length; i2++) {
+            if ((a2.cuts ?? "source-change") === "source-change" && v[i2].src === v[i2 - 1].src) continue;
+            at.push(Math.max(0, (starts.get(v[i2].id) ?? 0) + (a2.offset ?? -2)));
+          }
+          const next = structuredClone(p.timeline);
+          const removed = next.audio.sfx.filter((c3) => c3.id.startsWith("sfx_auto_")).length;
+          next.audio.sfx = next.audio.sfx.filter((c3) => !c3.id.startsWith("sfx_auto_"));
+          const added = at.map((f, i2) => ({ id: `sfx_auto_${i2 + 1}`, src: a2.srcs[i2 % a2.srcs.length], at: f, gainDb: a2.gainDb ?? -8 }));
+          next.audio.sfx.push(...added);
+          const fps = p.meta.fps;
+          const base = { added: added.map((c3) => ({ ...c3, tc: framesToTc(c3.at, fps) })), replaced: removed };
+          if (!a2.apply) return { ok: true, applied: false, ...base, next: "apply: true \u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E43\u0E0A\u0E49 / call again with apply: true" };
+          const backup = await applyTimeline(state, p, next, "before sfx_on_cuts");
+          return { ok: true, applied: true, backup, ...base, hint: UNDO };
+        }
+      })
+    ];
+  }
+});
+
 // src/mcp/tools-extra.ts
 var EXTRA_TOOLS;
 var init_tools_extra = __esm({
@@ -36576,7 +37742,8 @@ var init_tools_extra = __esm({
     init_tools_premiere();
     init_tools_ready();
     init_tools_premiere_edit();
-    EXTRA_TOOLS = [...READY_TOOLS, ...BOARD_TOOLS, ...MEDIA_TOOLS, ...AE_TOOLS, ...RULES_TOOLS, ...EDIT_TOOLS, ...REVIEW2_TOOLS, ...PREMIERE_TOOLS, ...PREMIERE_EDIT_TOOLS];
+    init_tools_reels();
+    EXTRA_TOOLS = [...READY_TOOLS, ...BOARD_TOOLS, ...MEDIA_TOOLS, ...AE_TOOLS, ...RULES_TOOLS, ...EDIT_TOOLS, ...REVIEW2_TOOLS, ...PREMIERE_TOOLS, ...PREMIERE_EDIT_TOOLS, ...REELS_TOOLS];
   }
 });
 
@@ -36591,10 +37758,10 @@ __export(tools_exports, {
   toolResultData: () => toolResultData,
   uniquePath: () => uniquePath3
 });
-import { existsSync as existsSync21 } from "node:fs";
-import { mkdir as mkdir20, readdir as readdir10, readFile as readFile13, rename as rename13, writeFile as writeFile14 } from "node:fs/promises";
-import os11 from "node:os";
-import { basename as basename14, dirname as dirname11, extname as extname12, isAbsolute as isAbsolute2, join as join20, relative as relative5, resolve as resolve12 } from "node:path";
+import { existsSync as existsSync23 } from "node:fs";
+import { mkdir as mkdir22, readdir as readdir10, readFile as readFile14, rename as rename14, writeFile as writeFile16 } from "node:fs/promises";
+import os14 from "node:os";
+import { basename as basename16, dirname as dirname12, extname as extname12, isAbsolute as isAbsolute2, join as join24, relative as relative5, resolve as resolve12 } from "node:path";
 async function runTool(t, args, state) {
   try {
     if (MUTATING.has(t.name) || t.mutating) {
@@ -36639,12 +37806,12 @@ function samePath6(a2, b) {
   return WIN ? x.toLowerCase() === y.toLowerCase() : x === y;
 }
 function uniquePath3(p) {
-  if (!existsSync21(p)) return p;
+  if (!existsSync23(p)) return p;
   const ext = extname12(p);
   const base = ext ? p.slice(0, -ext.length) : p;
   for (let i2 = 2; ; i2++) {
     const c3 = `${base}_${i2}${ext}`;
-    if (!existsSync21(c3)) return c3;
+    if (!existsSync23(c3)) return c3;
   }
 }
 function fileSafe(name) {
@@ -36664,8 +37831,14 @@ function isInside(child2, parent) {
 function assertWritable(target, what) {
   if (isProtected(target)) throw new ToolError(`\u0E2B\u0E49\u0E32\u0E21\u0E40\u0E02\u0E35\u0E22\u0E19\u0E43\u0E19\u0E42\u0E1F\u0E25\u0E40\u0E14\u0E2D\u0E23\u0E4C\u0E17\u0E35\u0E48\u0E1B\u0E49\u0E2D\u0E07\u0E01\u0E31\u0E19\u0E44\u0E27\u0E49 / refusing to write ${what} inside a protected path`, { path: target });
 }
+function nativeDir(p) {
+  if (!WIN && /^(?:[A-Za-z]:[\\/]|\\\\)/.test(p)) {
+    throw new ToolError(`path \u0E02\u0E2D\u0E07 Windows \u0E43\u0E0A\u0E49\u0E1A\u0E19\u0E40\u0E04\u0E23\u0E37\u0E48\u0E2D\u0E07\u0E19\u0E35\u0E49\u0E44\u0E21\u0E48\u0E44\u0E14\u0E49 / a Windows path cannot be used on ${process.platform}: ${p}`, { path: p });
+  }
+  return resolve12(p);
+}
 function assertConfined(state, target, aep, what) {
-  const roots = [dirname11(aep), ...state.project ? [state.project.dir] : []];
+  const roots = [dirname12(aep), ...state.project ? [state.project.dir] : []];
   if (!roots.some((r) => isInside(target, r))) {
     throw new ToolError(`${what} \u0E15\u0E49\u0E2D\u0E07\u0E2D\u0E22\u0E39\u0E48\u0E43\u0E19\u0E42\u0E1F\u0E25\u0E40\u0E14\u0E2D\u0E23\u0E4C\u0E42\u0E1B\u0E23\u0E40\u0E08\u0E01\u0E15\u0E4C\u0E2B\u0E23\u0E37\u0E2D\u0E42\u0E1F\u0E25\u0E40\u0E14\u0E2D\u0E23\u0E4C\u0E02\u0E2D\u0E07 .aep / ${what} must be inside the project folder or next to the .aep`, { path: target, allowed: roots });
   }
@@ -36715,10 +37888,10 @@ async function forgetRenders(state, p, ids, ctx) {
     const a2 = p.assets[id];
     if (!a2 || !isAeComp(a2)) continue;
     const old = a2.render?.path;
-    if (old && existsSync21(old)) {
+    if (old && existsSync23(old)) {
       const ext = extname12(old);
       const aside = uniquePath3(`${old.slice(0, old.length - ext.length)}_forced${ext}`);
-      await rename13(old, aside);
+      await rename14(old, aside);
       moved[id] = aside;
       ctx.log(`${id}: previous render kept as ${aside}`);
     }
@@ -36727,17 +37900,17 @@ async function forgetRenders(state, p, ids, ctx) {
   await state.api.project.saveProject(p);
   return moved;
 }
-async function backupTimeline4(p, reason) {
-  const dir = join20(p.dir, "history");
-  await mkdir20(dir, { recursive: true });
+async function backupTimeline5(p, reason) {
+  const dir = join24(p.dir, "history");
+  await mkdir22(dir, { recursive: true });
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const stamp = now.replace(/[:.]/g, "-");
   const body2 = `${JSON.stringify({ savedAt: now, reason, timeline: p.timeline }, null, 2)}
 `;
   for (let n2 = 1; ; n2++) {
-    const file = join20(dir, `timeline-${stamp}-${n2}.json`);
+    const file = join24(dir, `timeline-${stamp}-${n2}.json`);
     try {
-      await writeFile14(file, body2, { encoding: "utf8", flag: "wx" });
+      await writeFile16(file, body2, { encoding: "utf8", flag: "wx" });
       return file;
     } catch (e) {
       if (e.code !== "EEXIST") throw e;
@@ -36745,8 +37918,8 @@ async function backupTimeline4(p, reason) {
   }
 }
 async function listBackups(p) {
-  const dir = join20(p.dir, "history");
-  const names = existsSync21(dir) ? (await readdir10(dir)).filter((n2) => BACKUP_RE.test(n2)) : [];
+  const dir = join24(p.dir, "history");
+  const names = existsSync23(dir) ? (await readdir10(dir)).filter((n2) => BACKUP_RE.test(n2)) : [];
   const key = (n2) => {
     const m = BACKUP_RE.exec(n2);
     return [m[1], Number(m[2])];
@@ -36758,7 +37931,7 @@ async function listBackups(p) {
   });
   return Promise.all(names.map(async (name) => {
     try {
-      const d = JSON.parse(await readFile13(join20(dir, name), "utf8"));
+      const d = JSON.parse(await readFile14(join24(dir, name), "utf8"));
       const video = d.timeline?.video ?? [];
       return { name, savedAt: d.savedAt, reason: d.reason, clips: video.length, frames: video.reduce((s, c3) => s + (c3.dur > 0 ? c3.dur : 0), 0) };
     } catch {
@@ -36823,10 +37996,10 @@ function startReviewJob(state, id, open3, wait = true) {
   const running = activeJob2(state, PROJECT_JOBS2);
   if (running) throw new ToolError(`wait for ${running.name} before creating a review`, { jobId: running.id });
   const snapshot2 = versionPlan(p, v);
-  if (!open3 || !v.reviewProxy || !existsSync21(v.reviewProxy)) requireFfmpeg(state);
+  if (!open3 || !v.reviewProxy || !existsSync23(v.reviewProxy)) requireFfmpeg(state);
   const job = state.jobs.start(open3 ? "review_open" : "preview", async (ctx) => {
     v.reviewPlan ??= structuredClone(snapshot2);
-    if (!open3 || !v.reviewProxy || !existsSync21(v.reviewProxy)) {
+    if (!open3 || !v.reviewProxy || !existsSync23(v.reviewProxy)) {
       ctx.log("creating review proxy");
       v.reviewProxy = await state.assembler.reviewProxy(p, v.id, { signal: ctx.signal });
     }
@@ -37025,7 +38198,7 @@ function projectStatus(state, p) {
     jobs: state.jobs.list().filter((j) => j.status === "running" || j.status === "queued").map((j) => ({ id: j.id, name: j.name, progress: j.progress }))
   };
 }
-var MUTATING, WRITES_PROJECT, frames2, layerRef, ClipSchema, CutSchema, AudioClipSchema, DuckSchema, AudioTracksSchema, TimelineSchema, AeOpSchema, EditOpSchema, WIN, AE_WAIT_MS2, BACKUP_RE, PROJECT_JOBS2, QUICK_WAIT_MS, COMPAT_NOTES, CORE_TOOLS, TOOLS;
+var MUTATING, WRITES_PROJECT, frames3, layerRef, ClipSchema, CutSchema, AudioClipSchema, DuckSchema, AudioTracksSchema, TimelineSchema, AeOpSchema, EditOpSchema, WIN, AE_WAIT_MS2, BACKUP_RE, PROJECT_JOBS2, QUICK_WAIT_MS, COMPAT_NOTES, CORE_TOOLS, TOOLS;
 var init_tools2 = __esm({
   "src/mcp/tools.ts"() {
     "use strict";
@@ -37041,6 +38214,9 @@ var init_tools2 = __esm({
     init_tooldef();
     init_tools_extra();
     init_premiere();
+    init_ffmpeg();
+    init_transcribe();
+    init_platform();
     MUTATING = /* @__PURE__ */ new Set(["project_new", "project_open", "asset_add", "timeline_set", "timeline_edit", "audio_add", "ae_edit", "import_premiere_xml", "timeline_restore"]);
     WRITES_PROJECT = /* @__PURE__ */ new Set([
       "asset_add",
@@ -37057,37 +38233,37 @@ var init_tools2 = __esm({
       "review_submit",
       "export_premiere_xml"
     ]);
-    frames2 = external_exports.number().int();
+    frames3 = external_exports.number().int();
     layerRef = external_exports.union([external_exports.string(), external_exports.number()]);
     ClipSchema = external_exports.object({
       id: external_exports.string().min(1),
       src: external_exports.string().min(1).describe("asset id"),
-      in: frames2.min(0).describe("source in-point (frames)"),
-      dur: frames2.describe("timeline duration (frames)"),
+      in: frames3.min(0).describe("source in-point (frames)"),
+      dur: frames3.describe("timeline duration (frames)"),
       scale: external_exports.number().optional().describe("percent, default 100"),
       marker: external_exports.string().optional().describe("marker name at clip start"),
       slot: external_exports.string().optional().describe("board slot id this clip realises"),
       speed: external_exports.object({
         rate: external_exports.number().min(0.05).max(20).describe("0.5 = 50% slow motion, 2 = 200%; source frames used = round(dur * rate)"),
         rampFrom: external_exports.number().min(0.05).max(20).optional().describe("ramp: start rate, eased (smoothstep) to `rate` over rampFrames"),
-        rampFrames: frames2.min(0).optional().describe("ramp length in timeline frames at the clip start (needs rampFrom)"),
+        rampFrames: frames3.min(0).optional().describe("ramp length in timeline frames at the clip start (needs rampFrom)"),
         interpolation: external_exports.enum(["nearest", "blend", "motion"]).optional().describe("nearest = repeat/drop frames; blend = mix neighbours (default for slow motion); motion = optical flow (minterpolate, very slow)")
       }).optional().describe("retime; omit for realtime"),
       pushIn: external_exports.number().min(0).max(100).optional().describe("slow centred zoom over the clip in percent (8 = 100%\u2192108%), on top of scale")
     });
     CutSchema = external_exports.object({
       after: external_exports.string().describe("clip id; the cut between it and the next clip"),
-      dissolve: frames2.min(0).describe("frames; 0 = hard cut")
+      dissolve: frames3.min(0).describe("frames; 0 = hard cut")
     });
     AudioClipSchema = external_exports.object({
       id: external_exports.string().min(1),
       src: external_exports.string().min(1).describe("asset id"),
-      at: frames2.min(0).describe("timeline position (frames)"),
-      in: frames2.min(0).optional(),
-      dur: frames2.optional(),
+      at: frames3.min(0).describe("timeline position (frames)"),
+      in: frames3.min(0).optional(),
+      dur: frames3.optional(),
       gainDb: external_exports.number().optional(),
-      fadeIn: frames2.min(0).optional(),
-      fadeOut: frames2.min(0).optional()
+      fadeIn: frames3.min(0).optional(),
+      fadeOut: frames3.min(0).optional()
     });
     DuckSchema = external_exports.object({ underDb: external_exports.number(), attackMs: external_exports.number(), releaseMs: external_exports.number() });
     AudioTracksSchema = external_exports.object({
@@ -37105,8 +38281,8 @@ var init_tools2 = __esm({
     AeOpSchema = external_exports.discriminatedUnion("op", [
       external_exports.object({ op: external_exports.literal("setText"), layer: layerRef, text: external_exports.string(), fontSize: external_exports.number().optional(), font: external_exports.string().optional(), color: external_exports.tuple([external_exports.number(), external_exports.number(), external_exports.number()]).optional() }),
       external_exports.object({ op: external_exports.literal("replaceFootage"), layer: layerRef, path: external_exports.string() }),
-      external_exports.object({ op: external_exports.literal("shiftLayer"), layer: layerRef, frames: frames2 }),
-      external_exports.object({ op: external_exports.literal("setProperty"), layer: layerRef, property: external_exports.string(), value: external_exports.unknown(), atFrame: frames2.optional() }),
+      external_exports.object({ op: external_exports.literal("shiftLayer"), layer: layerRef, frames: frames3 }),
+      external_exports.object({ op: external_exports.literal("setProperty"), layer: layerRef, property: external_exports.string(), value: external_exports.unknown(), atFrame: frames3.optional() }),
       external_exports.object({ op: external_exports.literal("addEffect"), layer: layerRef, matchName: external_exports.string(), properties: external_exports.record(external_exports.unknown()).optional() }),
       external_exports.object({ op: external_exports.literal("applyPreset"), layer: layerRef, ffxPath: external_exports.string() }),
       external_exports.object({ op: external_exports.literal("setLayerEnabled"), layer: layerRef, enabled: external_exports.boolean() }),
@@ -37117,8 +38293,8 @@ var init_tools2 = __esm({
       external_exports.object({ op: external_exports.literal("insert"), clip: ClipSchema, index: external_exports.number().int().min(0).optional(), after: external_exports.string().optional().describe("insert after this clip id (default: end)") }),
       external_exports.object({ op: external_exports.literal("move"), id: external_exports.string(), index: external_exports.number().int().min(0) }),
       external_exports.object({ op: external_exports.literal("remove"), id: external_exports.string() }),
-      external_exports.object({ op: external_exports.literal("trim"), id: external_exports.string(), in: frames2.min(0).optional(), dur: frames2.optional() }),
-      external_exports.object({ op: external_exports.literal("set_dissolve"), after: external_exports.string(), frames: frames2.min(0).describe("0 removes the dissolve") }),
+      external_exports.object({ op: external_exports.literal("trim"), id: external_exports.string(), in: frames3.min(0).optional(), dur: frames3.optional() }),
+      external_exports.object({ op: external_exports.literal("set_dissolve"), after: external_exports.string(), frames: frames3.min(0).describe("0 removes the dissolve") }),
       external_exports.object({ op: external_exports.literal("set_marker"), id: external_exports.string(), name: external_exports.string().optional().describe("omit to remove") }),
       external_exports.object({ op: external_exports.literal("set_scale"), id: external_exports.string(), scale: external_exports.number().positive() }),
       external_exports.object({ op: external_exports.literal("remove_audio"), id: external_exports.string() })
@@ -37129,7 +38305,7 @@ var init_tools2 = __esm({
     PROJECT_JOBS2 = ["build", "deliver", "preview", "review_open"];
     QUICK_WAIT_MS = 2e4;
     COMPAT_NOTES = [
-      "AE headless = AfterFX.com -m -noui -r <jsx>: \u0E15\u0E49\u0E2D\u0E07\u0E21\u0E35 -m \u0E40\u0E2A\u0E21\u0E2D \u0E44\u0E21\u0E48\u0E07\u0E31\u0E49\u0E19\u0E2A\u0E04\u0E23\u0E34\u0E1B\u0E15\u0E4C\u0E08\u0E30\u0E44\u0E1B\u0E23\u0E31\u0E19\u0E43\u0E19 AE \u0E17\u0E35\u0E48\u0E40\u0E1B\u0E34\u0E14\u0E2D\u0E22\u0E39\u0E48 (DESIGN \xA72.1)",
+      process.platform === "darwin" ? "AE \u0E1A\u0E19 macOS \u0E44\u0E21\u0E48\u0E21\u0E35 -noui: CatCut \u0E2A\u0E31\u0E48\u0E07\u0E1C\u0E48\u0E32\u0E19 AppleScript (DoScriptFile) \u0E40\u0E1B\u0E34\u0E14 AE \u0E02\u0E2D\u0E07\u0E15\u0E31\u0E27\u0E40\u0E2D\u0E07\u0E41\u0E25\u0E49\u0E27\u0E1B\u0E34\u0E14\u0E40\u0E21\u0E37\u0E48\u0E2D\u0E40\u0E2A\u0E23\u0E47\u0E08 \u2014 \u0E15\u0E49\u0E2D\u0E07\u0E1B\u0E34\u0E14 AE \u0E17\u0E35\u0E48\u0E40\u0E1B\u0E34\u0E14\u0E2D\u0E22\u0E39\u0E48\u0E01\u0E48\u0E2D\u0E19 \u0E41\u0E25\u0E30\u0E2D\u0E19\u0E38\u0E0D\u0E32\u0E15 Automation \u0E04\u0E23\u0E31\u0E49\u0E07\u0E41\u0E23\u0E01" : "AE headless = AfterFX.com -m -noui -r <jsx>: \u0E15\u0E49\u0E2D\u0E07\u0E21\u0E35 -m \u0E40\u0E2A\u0E21\u0E2D \u0E44\u0E21\u0E48\u0E07\u0E31\u0E49\u0E19\u0E2A\u0E04\u0E23\u0E34\u0E1B\u0E15\u0E4C\u0E08\u0E30\u0E44\u0E1B\u0E23\u0E31\u0E19\u0E43\u0E19 AE \u0E17\u0E35\u0E48\u0E40\u0E1B\u0E34\u0E14\u0E2D\u0E22\u0E39\u0E48 (DESIGN \xA72.1)",
       "AE 25.2.2\u201326.3: \u0E0A\u0E37\u0E48\u0E2D\u0E44\u0E1F\u0E25\u0E4C output \u0E20\u0E32\u0E29\u0E32\u0E44\u0E17\u0E22\u0E08\u0E32\u0E01\u0E2A\u0E04\u0E23\u0E34\u0E1B\u0E15\u0E4C\u0E01\u0E25\u0E32\u0E22\u0E40\u0E1B\u0E47\u0E19\u0E02\u0E35\u0E14 \u2192 render \u0E0A\u0E37\u0E48\u0E2D ASCII \u0E41\u0E25\u0E49\u0E27 rename (DESIGN \xA72.1)",
       "saveFrameToPng \u0E44\u0E21\u0E48\u0E40\u0E2A\u0E16\u0E35\u0E22\u0E23 \u2192 preview frame \u0E43\u0E0A\u0E49 aerender -s N -e N (DESIGN \xA72.1)",
       'OutputModule.setSettings \u0E40\u0E1B\u0E25\u0E35\u0E48\u0E22\u0E19 Format \u0E44\u0E21\u0E48\u0E44\u0E14\u0E49 \u2192 \u0E15\u0E49\u0E2D\u0E07\u0E21\u0E35 OM template "EDITMCP ProRes 422 HQ" \u0E2B\u0E23\u0E37\u0E2D fallback Lossless + ffmpeg (DESIGN \xA72.1, \xA712)',
@@ -37152,11 +38328,12 @@ var init_tools2 = __esm({
           targets: external_exports.array(external_exports.string()).optional().describe("delivery target ids (see delivery_presets)")
         },
         handler: async (a2, state) => {
-          const dir = resolve12(a2.dir);
+          assertWritable(a2.dir, "project_new.dir");
+          const dir = nativeDir(a2.dir);
           assertWritable(dir, "project_new.dir");
           const unknown2 = (a2.targets ?? []).filter((t) => !PRESETS[t]);
           if (unknown2.length) throw new ToolError(`\u0E44\u0E21\u0E48\u0E23\u0E39\u0E49\u0E08\u0E31\u0E01 target / unknown delivery targets: ${unknown2.join(", ")}`, { known: Object.keys(PRESETS) });
-          if (existsSync21(join20(dir, "project.json"))) throw new ToolError("\u0E21\u0E35\u0E42\u0E1B\u0E23\u0E40\u0E08\u0E01\u0E15\u0E4C\u0E2D\u0E22\u0E39\u0E48\u0E41\u0E25\u0E49\u0E27 \u0E43\u0E0A\u0E49 project_open / project already exists, use project_open", { dir });
+          if (existsSync23(join24(dir, "project.json"))) throw new ToolError("\u0E21\u0E35\u0E42\u0E1B\u0E23\u0E40\u0E08\u0E01\u0E15\u0E4C\u0E2D\u0E22\u0E39\u0E48\u0E41\u0E25\u0E49\u0E27 \u0E43\u0E0A\u0E49 project_open / project already exists, use project_open", { dir });
           const p = await state.api.project.createProject(dir, { name: a2.name, fps: a2.fps, width: a2.width, height: a2.height });
           if (a2.targets?.length) {
             p.delivery.targets = [...new Set(a2.targets)];
@@ -37217,12 +38394,12 @@ var init_tools2 = __esm({
           if (a2.aep) {
             if (!a2.comp) throw new ToolError("\u0E15\u0E49\u0E2D\u0E07\u0E23\u0E30\u0E1A\u0E38 comp \u0E04\u0E39\u0E48\u0E01\u0E31\u0E1A aep / comp is required with aep");
             const aep = resolve12(a2.aep);
-            if (!existsSync21(aep)) throw new ToolError(`\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E44\u0E1F\u0E25\u0E4C / file not found: ${aep}`);
+            if (!existsSync23(aep)) throw new ToolError(`\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E44\u0E1F\u0E25\u0E4C / file not found: ${aep}`);
             asset = state.api.project.addAeComp(p, aep, a2.comp, a2.id);
           } else if (a2.path) {
             requireFfmpeg(state);
             const path12 = resolve12(a2.path);
-            if (!existsSync21(path12)) throw new ToolError(`\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E44\u0E1F\u0E25\u0E4C / file not found: ${path12}`);
+            if (!existsSync23(path12)) throw new ToolError(`\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E44\u0E1F\u0E25\u0E4C / file not found: ${path12}`);
             asset = await state.api.project.addFileAsset(p, path12, { id: a2.id, kind: a2.kind, probe: state.api.probe });
           } else {
             throw new ToolError("\u0E15\u0E49\u0E2D\u0E07\u0E23\u0E30\u0E1A\u0E38 path \u0E2B\u0E23\u0E37\u0E2D aep+comp / give path, or aep + comp");
@@ -37267,13 +38444,13 @@ var init_tools2 = __esm({
         input: {
           track: external_exports.enum(["vo", "music", "sfx"]),
           src: external_exports.string().describe("asset id"),
-          at: frames2.min(0).default(0),
+          at: frames3.min(0).default(0),
           id: external_exports.string().optional(),
-          in: frames2.min(0).optional(),
-          dur: frames2.optional(),
+          in: frames3.min(0).optional(),
+          dur: frames3.optional(),
           gainDb: external_exports.number().optional(),
-          fadeIn: frames2.min(0).optional(),
-          fadeOut: frames2.min(0).optional(),
+          fadeIn: frames3.min(0).optional(),
+          fadeOut: frames3.min(0).optional(),
           duck: DuckSchema.optional().describe("music under vo, e.g. {underDb:-12, attackMs:150, releaseMs:400}"),
           useClipAudio: external_exports.boolean().optional()
         },
@@ -37309,7 +38486,7 @@ var init_tools2 = __esm({
       tool({
         name: "ae_inspect_comp",
         description: "\u0E14\u0E39 layer \u0E02\u0E2D\u0E07 comp (\u0E0A\u0E19\u0E34\u0E14, in/out, \u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21, effects, \u0E02\u0E2D\u0E1A\u0E40\u0E02\u0E15; job) \xB7 Inspect a comp's layers (job)",
-        input: { aep: external_exports.string(), comp: external_exports.string(), atFrame: frames2.min(0).optional(), wait: external_exports.boolean().optional() },
+        input: { aep: external_exports.string(), comp: external_exports.string(), atFrame: frames3.min(0).optional(), wait: external_exports.boolean().optional() },
         handler: async (a2, state) => {
           const aep = resolve12(a2.aep);
           return runAeJob2(state, "ae_inspect_comp", a2.wait, async () => {
@@ -37370,19 +38547,19 @@ var init_tools2 = __esm({
           if (!state.ae.create) throw new ToolError("AE backend cannot create projects");
           if (!a2.jsx === !a2.jsxPath) throw new ToolError("\u0E23\u0E30\u0E1A\u0E38 jsx \u0E2B\u0E23\u0E37\u0E2D jsxPath \u0E2D\u0E22\u0E48\u0E32\u0E07\u0E43\u0E14\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E2B\u0E19\u0E36\u0E48\u0E07 / give exactly one of jsx or jsxPath");
           const jsxPath = a2.jsxPath ? resolve12(a2.jsxPath) : void 0;
-          if (jsxPath && !existsSync21(jsxPath)) throw new ToolError(`\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E44\u0E1F\u0E25\u0E4C / file not found: ${jsxPath}`);
+          if (jsxPath && !existsSync23(jsxPath)) throw new ToolError(`\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E44\u0E1F\u0E25\u0E4C / file not found: ${jsxPath}`);
           if (!jsxPath || a2.asset) requireProject(state);
           const saveAs = resolve12(a2.saveAs);
           const ext = extname12(saveAs).toLowerCase();
           if (ext !== ".aep" && ext !== ".ecproj") throw new ToolError("saveAs \u0E15\u0E49\u0E2D\u0E07\u0E40\u0E1B\u0E47\u0E19 .aep \u0E2B\u0E23\u0E37\u0E2D .ecproj / saveAs must end in .aep or .ecproj");
           if (ext === ".ecproj" && !state.env.tools.effectcraftCli) throw new ToolError("\u0E44\u0E21\u0E48\u0E1E\u0E1A EffectCraft / effectcraft-cli not found (install EffectCraft or set EDITMCP_EFFECTCRAFT_DIR)");
-          if (existsSync21(saveAs)) throw new ToolError(`\u0E21\u0E35\u0E44\u0E1F\u0E25\u0E4C\u0E19\u0E35\u0E49\u0E41\u0E25\u0E49\u0E27 \u0E43\u0E0A\u0E49\u0E0A\u0E37\u0E48\u0E2D\u0E43\u0E2B\u0E21\u0E48 / refusing to overwrite: ${saveAs}`);
-          assertConfined(state, saveAs, jsxPath ?? join20(state.project.dir, "x"), "saveAs");
+          if (existsSync23(saveAs)) throw new ToolError(`\u0E21\u0E35\u0E44\u0E1F\u0E25\u0E4C\u0E19\u0E35\u0E49\u0E41\u0E25\u0E49\u0E27 \u0E43\u0E0A\u0E49\u0E0A\u0E37\u0E48\u0E2D\u0E43\u0E2B\u0E21\u0E48 / refusing to overwrite: ${saveAs}`);
+          assertConfined(state, saveAs, jsxPath ?? join24(state.project.dir, "x"), "saveAs");
           const existing = a2.asset?.id ? state.project.assets[a2.asset.id] : void 0;
           if (existing && existing.kind !== "aecomp") throw new ToolError(`asset id already in use by a ${existing.kind} file: ${a2.asset.id}`);
-          const jsx = a2.jsx ?? await readFile13(jsxPath, "utf8");
+          const jsx = a2.jsx ?? await readFile14(jsxPath, "utf8");
           return runAeJob2(state, "ae_create", a2.wait, async () => {
-            const res = await state.ae.create({ jsx, saveAs, ...jsxPath ? { scriptDir: dirname11(jsxPath) } : {} });
+            const res = await state.ae.create({ jsx, saveAs, ...jsxPath ? { scriptDir: dirname12(jsxPath) } : {} });
             let asset;
             const p = state.project;
             if (p && a2.asset) {
@@ -37409,7 +38586,7 @@ var init_tools2 = __esm({
         input: {
           aep: external_exports.string(),
           comp: external_exports.string(),
-          frame: frames2.min(0).default(0),
+          frame: frames3.min(0).default(0),
           out: external_exports.string().optional().describe("png path inside the project folder or next to the .aep (default: project review folder)"),
           wait: external_exports.boolean().optional()
         },
@@ -37418,11 +38595,11 @@ var init_tools2 = __esm({
           let out2 = a2.out ? resolve12(a2.out) : "";
           if (out2) {
             assertConfined(state, out2, aep, "out");
-            await mkdir20(dirname11(out2), { recursive: true });
+            await mkdir22(dirname12(out2), { recursive: true });
           } else {
-            const dir = state.project ? state.api.project.projectPaths(state.project).review : join20(os11.tmpdir(), "editmcp");
-            await mkdir20(dir, { recursive: true });
-            out2 = join20(dir, `preview_${asciiSlug(a2.comp)}_${a2.frame}.png`);
+            const dir = state.project ? state.api.project.projectPaths(state.project).review : join24(os14.tmpdir(), "editmcp");
+            await mkdir22(dir, { recursive: true });
+            out2 = join24(dir, `preview_${asciiSlug(a2.comp)}_${a2.frame}.png`);
           }
           return runAeJob2(state, "ae_preview_frame", a2.wait, async () => {
             const png = await state.ae.previewFrame(aep, a2.comp, a2.frame, uniquePath3(out2));
@@ -37590,7 +38767,7 @@ var init_tools2 = __esm({
       tool({
         name: "review_submit",
         description: "\u0E2A\u0E48\u0E07\u0E2A\u0E33\u0E40\u0E19\u0E32\u0E42\u0E19\u0E49\u0E15\u0E17\u0E35\u0E48\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E41\u0E25\u0E49\u0E27\u0E43\u0E2B\u0E49 agent \u0E2D\u0E48\u0E32\u0E19 \u0E44\u0E21\u0E48\u0E41\u0E01\u0E49\u0E44\u0E17\u0E21\u0E4C\u0E44\u0E25\u0E19\u0E4C \xB7 Submit an immutable note snapshot",
-        input: { version: external_exports.string().optional(), revision: frames2.min(0).optional() },
+        input: { version: external_exports.string().optional(), revision: frames3.min(0).optional() },
         handler: async (a2, state) => {
           const p = requireProject(state), v = reviewVersion(p, a2.version);
           return submitReview(p, v, a2.revision);
@@ -37623,10 +38800,10 @@ var init_tools2 = __esm({
           const sequenceName = a2.sequenceName ?? `${p.meta.name}_${version3}`;
           const target = a2.target ?? "premiere";
           const xml = state.api.xmeml.writeXmeml(p, { sequenceName, flavor: target });
-          const dir = join20(state.api.project.projectPaths(p).out, version3);
-          await mkdir20(dir, { recursive: true });
-          const path12 = uniquePath3(join20(dir, `${fileSafe(p.meta.name)}${target === "premiere" ? "" : `_${target}`}.xml`));
-          await writeFile14(path12, xml, { encoding: "utf8", flag: "wx" });
+          const dir = join24(state.api.project.projectPaths(p).out, version3);
+          await mkdir22(dir, { recursive: true });
+          const path12 = uniquePath3(join24(dir, `${fileSafe(p.meta.name)}${target === "premiere" ? "" : `_${target}`}.xml`));
+          await writeFile16(path12, xml, { encoding: "utf8", flag: "wx" });
           const warnings = xmemlExportWarnings(p);
           return {
             ok: true,
@@ -37651,15 +38828,15 @@ var init_tools2 = __esm({
         handler: async (a2, state) => {
           const p = requireProject(state);
           const path12 = resolve12(a2.path);
-          if (!existsSync21(path12)) throw new ToolError(`\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E44\u0E1F\u0E25\u0E4C / file not found: ${path12}`);
-          const r = state.api.xmeml.readXmeml(await readFile13(path12, "utf8"), p);
+          if (!existsSync23(path12)) throw new ToolError(`\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E44\u0E1F\u0E25\u0E4C / file not found: ${path12}`);
+          const r = state.api.xmeml.readXmeml(await readFile14(path12, "utf8"), p);
           const warnings = [...r.warnings ?? []];
           if (r.fps !== p.meta.fps) warnings.push(`fps \u0E43\u0E19 XML = ${r.fps} \u0E41\u0E15\u0E48\u0E42\u0E1B\u0E23\u0E40\u0E08\u0E01\u0E15\u0E4C = ${p.meta.fps}`);
           if (r.width !== p.meta.width || r.height !== p.meta.height) warnings.push(`\u0E02\u0E19\u0E32\u0E14\u0E43\u0E19 XML = ${r.width}x${r.height} \u0E41\u0E15\u0E48\u0E42\u0E1B\u0E23\u0E40\u0E08\u0E01\u0E15\u0E4C = ${p.meta.width}x${p.meta.height}`);
           const diff = diffTimelines(p.timeline, r.timeline);
           const summary = summarizeDiff(diff, p.meta.fps);
           const { errors } = validateCandidate(state, p, r.timeline);
-          const report2 = { file: basename14(path12), summary, diff, warnings, unresolvedPaths: r.unresolvedPaths };
+          const report2 = { file: basename16(path12), summary, diff, warnings, unresolvedPaths: r.unresolvedPaths };
           if (!a2.apply) {
             return {
               ok: true,
@@ -37672,7 +38849,7 @@ var init_tools2 = __esm({
             };
           }
           if (errors.length) throw new ToolError("\u0E44\u0E17\u0E21\u0E4C\u0E44\u0E25\u0E19\u0E4C\u0E08\u0E32\u0E01 XML \u0E44\u0E21\u0E48\u0E1C\u0E48\u0E32\u0E19\u0E01\u0E32\u0E23\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A \u0E44\u0E21\u0E48\u0E44\u0E14\u0E49\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01 / imported timeline invalid, not applied", { errors, ...report2 });
-          const backup = await backupTimeline4(p, `before import_premiere_xml ${basename14(path12)}`);
+          const backup = await backupTimeline5(p, `before import_premiere_xml ${basename16(path12)}`);
           await commitOrThrow(state, p, r.timeline, "timeline");
           return { ok: true, applied: true, backup, ...report2, timeline: timelineSummary(state, p), hint: "\u0E22\u0E49\u0E2D\u0E19\u0E01\u0E25\u0E31\u0E1A\u0E44\u0E14\u0E49\u0E14\u0E49\u0E27\u0E22 timeline_restore / undo with timeline_restore" };
         }
@@ -37684,12 +38861,12 @@ var init_tools2 = __esm({
         handler: async (a2, state) => {
           const p = requireProject(state);
           if (!a2.backup) return { backups: await listBackups(p), hint: 'timeline_restore {backup: "<name>"} \u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E22\u0E49\u0E2D\u0E19\u0E01\u0E25\u0E31\u0E1A / pass a name to restore' };
-          if (basename14(a2.backup) !== a2.backup || !BACKUP_RE.test(a2.backup)) throw new ToolError(`\u0E0A\u0E37\u0E48\u0E2D\u0E44\u0E1F\u0E25\u0E4C\u0E2A\u0E33\u0E23\u0E2D\u0E07\u0E44\u0E21\u0E48\u0E16\u0E39\u0E01\u0E15\u0E49\u0E2D\u0E07 / not a timeline backup name: ${a2.backup}`);
-          const file = join20(p.dir, "history", a2.backup);
-          if (!existsSync21(file)) throw new ToolError(`\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E44\u0E1F\u0E25\u0E4C\u0E2A\u0E33\u0E23\u0E2D\u0E07 / backup not found: ${a2.backup}`, { backups: (await listBackups(p)).map((b) => b.name) });
+          if (basename16(a2.backup) !== a2.backup || !BACKUP_RE.test(a2.backup)) throw new ToolError(`\u0E0A\u0E37\u0E48\u0E2D\u0E44\u0E1F\u0E25\u0E4C\u0E2A\u0E33\u0E23\u0E2D\u0E07\u0E44\u0E21\u0E48\u0E16\u0E39\u0E01\u0E15\u0E49\u0E2D\u0E07 / not a timeline backup name: ${a2.backup}`);
+          const file = join24(p.dir, "history", a2.backup);
+          if (!existsSync23(file)) throw new ToolError(`\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E44\u0E1F\u0E25\u0E4C\u0E2A\u0E33\u0E23\u0E2D\u0E07 / backup not found: ${a2.backup}`, { backups: (await listBackups(p)).map((b) => b.name) });
           let next;
           try {
-            next = JSON.parse(await readFile13(file, "utf8")).timeline;
+            next = JSON.parse(await readFile14(file, "utf8")).timeline;
           } catch (e) {
             throw new ToolError(`\u0E2D\u0E48\u0E32\u0E19\u0E44\u0E1F\u0E25\u0E4C\u0E2A\u0E33\u0E23\u0E2D\u0E07\u0E44\u0E21\u0E48\u0E44\u0E14\u0E49 / unreadable backup: ${e instanceof Error ? e.message : String(e)}`);
           }
@@ -37697,7 +38874,7 @@ var init_tools2 = __esm({
           const { errors, timeline: normalized } = validateCandidate(state, p, next);
           if (errors.length) throw new ToolError("\u0E44\u0E17\u0E21\u0E4C\u0E44\u0E25\u0E19\u0E4C\u0E43\u0E19\u0E44\u0E1F\u0E25\u0E4C\u0E2A\u0E33\u0E23\u0E2D\u0E07\u0E44\u0E21\u0E48\u0E1C\u0E48\u0E32\u0E19\u0E01\u0E32\u0E23\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A \u0E44\u0E21\u0E48\u0E44\u0E14\u0E49\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01 / backup timeline invalid, not applied", { errors });
           const diff = diffTimelines(p.timeline, normalized);
-          const backup = await backupTimeline4(p, `before timeline_restore ${a2.backup}`);
+          const backup = await backupTimeline5(p, `before timeline_restore ${a2.backup}`);
           await commitOrThrow(state, p, next, "timeline");
           return { ok: true, restored: a2.backup, backup, summary: summarizeDiff(diff, p.meta.fps), timeline: timelineSummary(state, p) };
         }
@@ -37708,7 +38885,7 @@ var init_tools2 = __esm({
         input: {},
         handler: async (_a, state) => {
           const env = state.env;
-          const freeRamGb = os11.freemem() / 2 ** 30;
+          const freeRamGb = freeRamBytes() / 2 ** 30;
           let aeVersion = "unknown (not launched)";
           if (process.env["EDITMCP_ALLOW_AE"] === "1" && env.tools.afterfx) {
             try {
@@ -37739,6 +38916,15 @@ var init_tools2 = __esm({
               return st.installed ? "installed, Premiere closed (fine: premiere_open starts it with the project)" : "not installed (optional; `catcut premiere-bridge install` for premiere_* tools without computer use)";
             })(),
             effectcraft: env.tools.effectcraftCli ? "found (optional; .ecproj comps: ae_create / build render them headless)" : "not found (optional)",
+            captions: await (async () => {
+              const w = findWhisper();
+              const libass = env.tools.ffmpeg ? await hasFilter(env.tools.ffmpeg, "subtitles") : false;
+              const parts = [
+                libass ? "burn-in ok (libass)" : "no libass: captions/text cannot be burned (macOS: brew install ffmpeg-full)",
+                w.cli ? `whisper ${w.model ? basename16(w.model) : `has no model (put ggml-*.bin in ${modelsDir()})`}` : "whisper-cli not found (transcribe unavailable)"
+              ];
+              return parts.join(" \xB7 ");
+            })(),
             problems: state.problems,
             compat: COMPAT_NOTES,
             project: state.project ? { name: state.project.meta.name, dir: state.project.dir } : null
@@ -48028,6 +49214,7 @@ var INSTRUCTIONS = [
   "New AE comps: write a JSX build script and run ae_create (never launch AfterFX/aerender/ffmpeg yourself, never write into out/). Long jobs: job_wait {id}, never sleep-poll.",
   "EffectCraft (ArtCraft): ae_create with saveAs *.ecproj builds the comp in EffectCraft instead of After Effects; every ae_* tool and build accept .ecproj. Use match-name property paths and new TextDocument(...) so a script runs in both hosts.",
   "Review: review_open (returns the URL) \u2192 user selects shots/ranges and annotates \u2192 review_notes. Propose edits from submitted notes before applying them. Evidence for notes: rules_evidence {clipIds, offsets}.",
+  "Reels / TikTok (talking head): jumpcut \u2192 punch_in \u2192 transcribe \u2192 captions_set + captions_plan (proofread, fix with captions_set {fixes}) \u2192 text_add (hook) \u2192 sfx_on_cuts \u2192 build \u2192 deliver vert. Timeline tools are dry runs until apply: true; captions/text burn into deliverables only.",
   "Builds are incremental: unchanged segments are never re-encoded; outputs are never overwritten (new version each build)."
 ].join("\n");
 async function createServer2(state) {
@@ -48141,6 +49328,7 @@ function printDoctor(d) {
   out(`  ffmpeg version   ${d["ffmpegVersion"] ?? "-"}`);
   out(`  AE version       ${d["aeVersion"]}`);
   out(`  Premiere bridge  ${d["premiereBridge"] ?? "-"}`);
+  out(`  captions         ${d["captions"] ?? "-"}`);
   out("");
   out(`encoders  ${Object.entries(enc).map(([k, v]) => `${v ? "+" : "-"}${k}`).join("  ")}`);
   out(`gpu       ${d["gpu"]}`);

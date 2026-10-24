@@ -26,7 +26,9 @@ interface AeOptions {
     /** Timeout for jobs that snapshot whole comps: fingerprint, inspect, edit (default 10 min; big projects are slow). */
     fingerprintTimeoutMs?: number;
     minFreeRamGb?: number;
-    /** Running processes named AfterFX.exe (injectable for tests; default: tasklist on Windows). */
+    /** macOS: how long to wait for AE to quit after a job before killing it (default 60 s). */
+    macQuitWaitMs?: number;
+    /** Running After Effects processes (injectable for tests; default: tasklist on Windows, ps on macOS). */
     listProcesses?: () => Promise<AeProcess[]>;
     /** AE's "Allow Scripts to Write Files" pref (injectable for tests; default: read from AE prefs). */
     scriptingPref?: () => Promise<AeScriptingPref>;
@@ -54,8 +56,13 @@ export interface HeadlessAeBackend extends AeBackend {
     /** Call after a batch of renders: purges AE caches when the disk-cache drive is low (see AeOptions.purge). */
     afterRenderBatch(policy?: PurgePolicy): Promise<PurgeOutcome>;
 }
-/** AfterFX.exe processes via `tasklist /V` (window title separates a GUI from -noui instances). */
+/**
+ * AfterFX.exe processes via `tasklist /V` (window title separates a GUI from -noui instances). On macOS
+ * every After Effects process is a GUI (there is no -noui), so each gets its app name as title.
+ */
 export declare function listAfterFxProcesses(spawn?: SpawnFn): Promise<AeProcess[]>;
+/** AppleScript that runs a JSX file in After Effects and waits for it (AE's own DoScriptFile command). */
+export declare function doScriptFile(app: string, jsx: string, timeoutMs: number): string;
 export declare function createAeBackend(tools: ToolPaths, opts?: AeOptions): HeadlessAeBackend;
 /** A layer as the mock sees it: just the facts the runner's analysis commands read from AE. */
 export interface MockLayer {

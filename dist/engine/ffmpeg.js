@@ -1,13 +1,15 @@
 import { execa } from 'execa';
 import { constants, existsSync } from 'node:fs';
-import { copyFile, link, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { copyFile, link, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
+import os from 'node:os';
 import { performance } from 'node:perf_hooks';
 import { hashFile, hashJson, hashString } from '../core/hash.js';
 import { captureReviewPlan, clipInterpolation, clipSourceNeeds, clipStartFrames, curvePos, curveSlot, curveTime, nextVersionId, planHash, projectPaths, saveProject, shownFrame, speedCurve, timelineFrames, validateTimeline, } from '../core/project.js';
 import { splitDissolve } from '../core/timecode.js';
 import { MASTER_PRESET_ID, presetToFfmpegArgs, resolvePreset } from './presets.js';
+import { assFor, captionTargets, projectWords, subtitlesFilter, transcriptsDir } from './captions.js';
 // ---------- process helpers ----------
 const FF_BASE = ['-hide_banner', '-nostdin', '-loglevel', 'error'];
 const PRORES_HQ_ARGS = ['-c:v', 'prores_ks', '-profile:v', '3', '-vendor', 'apl0', '-pix_fmt', 'yuv422p10le'];
@@ -1120,54 +1122,85 @@ export class Assembler {
         const baseName = `${sanitizeName(p.meta.name, 'master')}_${versionId}`;
         let done = 0;
         opts.onProgress?.({ stage: 'deliver', done: 0, total: targets.length });
-        for (const target of targets) {
-            throwIfAborted(opts.signal);
-            const preset = resolvePreset(target, p.delivery.overrides?.[target]);
-            const tfps = preset.video.fps ?? fps;
-            const W = preset.video.width;
-            const H = preset.video.height;
-            const enc = presetToFfmpegArgs(preset, this.env, { width: W, height: H, fps: tfps });
-            const vf = [];
-            const sameAspect = Math.abs(W / H - mw / mh) < 0.01;
-            const scale = W === mw && H === mh ? []
-                : [sameAspect ? `scale=${W}:${H}:flags=lanczos` : `scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W}:${H}`];
-            if (preset.video.interlaced && Math.abs(fps - tfps * 2) < 0.01) {
-                // 50p master -> 25i: scale the progressive frames, then weave field pairs (scaling woven
-                // frames would blend the two fields together).
-                vf.push(...scale, 'tinterlace=interleave_top');
+        // captions / text overlays: burned into the targets that take them (never into the master)
+        const burnTargets = new Set(captionTargets(p.captions, targets));
+        const burning = targets.some((t) => burnTargets.has(t)) && !!p.captions && (p.captions.enabled || !!p.captions.texts?.length);
+        let words = new Map();
+        let subDir;
+        if (burning) {
+            if (!(await hasFilter(this.tools.ffmpeg, 'subtitles'))) {
+                throw new Error('this ffmpeg cannot burn captions (no libass): install an ffmpeg with libass, e.g. `brew install ffmpeg-full` on macOS, or set EDITMCP_FFMPEG');
             }
-            else {
-                if (Math.abs(tfps - fps) > 1e-3)
-                    vf.push(`fps=${fpsExpr(tfps)}`);
-                vf.push(...scale);
-                // 25p master -> 25i: PsF (flag fields, keep every frame).
-                if (preset.video.interlaced)
-                    vf.push('setfield=tff');
+            if (p.captions.enabled) {
+                words = await projectWords(p, this.tools, transcriptsDir(p), {
+                    ...(opts.signal ? { signal: opts.signal } : {}),
+                    onTranscribe: (id) => opts.onProgress?.({ stage: 'deliver', done, total: targets.length, message: `transcribing ${id} (whisper)` }),
+                });
             }
-            vf.push('setsar=1');
-            const args = [...FF_BASE, '-y', '-i', version.master, '-map', '0:v:0', '-map', '0:a:0?', '-vf', vf.join(','), ...enc.videoArgs];
-            if (preset.loudness && !sameLoudness(preset.loudness, masterLoud)) {
-                const t = { integratedLufs: preset.loudness.integratedLufs, truePeakDb: preset.loudness.truePeakDb, lra: preset.loudness.lra ?? 7 };
-                const key = hashJson({ master: version.master, target: t });
-                if (!this.loudnessCache.has(key))
-                    this.loudnessCache.set(key, await measureLoudnorm(this.tools, version.master, t, opts.signal));
-                const m = this.loudnessCache.get(key);
-                if (m)
-                    args.push('-af', loudnormPass2(m, t));
+            if (!isAsciiPath(os.tmpdir()))
+                throw new Error('captions need an ASCII TEMP directory; set TEMP/TMP to an ASCII path');
+            subDir = await mkdtemp(path.join(os.tmpdir(), 'catcut-subs-'));
+        }
+        try {
+            for (const target of targets) {
+                throwIfAborted(opts.signal);
+                const preset = resolvePreset(target, p.delivery.overrides?.[target]);
+                const tfps = preset.video.fps ?? fps;
+                const W = preset.video.width;
+                const H = preset.video.height;
+                const enc = presetToFfmpegArgs(preset, this.env, { width: W, height: H, fps: tfps });
+                const vf = [];
+                const sameAspect = Math.abs(W / H - mw / mh) < 0.01;
+                const scale = W === mw && H === mh ? []
+                    : [sameAspect ? `scale=${W}:${H}:flags=lanczos` : `scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W}:${H}`];
+                if (preset.video.interlaced && Math.abs(fps - tfps * 2) < 0.01) {
+                    // 50p master -> 25i: scale the progressive frames, then weave field pairs (scaling woven
+                    // frames would blend the two fields together).
+                    vf.push(...scale, 'tinterlace=interleave_top');
+                }
+                else {
+                    if (Math.abs(tfps - fps) > 1e-3)
+                        vf.push(`fps=${fpsExpr(tfps)}`);
+                    vf.push(...scale);
+                    // 25p master -> 25i: PsF (flag fields, keep every frame).
+                    if (preset.video.interlaced)
+                        vf.push('setfield=tff');
+                }
+                const ass = subDir && burnTargets.has(target) ? assFor(p, words, { width: W, height: H }) : undefined;
+                if (ass) {
+                    const file = path.join(subDir, `${preset.id}.ass`);
+                    await writeFile(file, ass, 'utf8');
+                    vf.push(subtitlesFilter(file));
+                }
+                vf.push('setsar=1');
+                const args = [...FF_BASE, '-y', '-i', version.master, '-map', '0:v:0', '-map', '0:a:0?', '-vf', vf.join(','), ...enc.videoArgs];
+                if (preset.loudness && !sameLoudness(preset.loudness, masterLoud)) {
+                    const t = { integratedLufs: preset.loudness.integratedLufs, truePeakDb: preset.loudness.truePeakDb, lra: preset.loudness.lra ?? 7 };
+                    const key = hashJson({ master: version.master, target: t });
+                    if (!this.loudnessCache.has(key))
+                        this.loudnessCache.set(key, await measureLoudnorm(this.tools, version.master, t, opts.signal));
+                    const m = this.loudnessCache.get(key);
+                    if (m)
+                        args.push('-af', loudnormPass2(m, t));
+                }
+                args.push(...enc.audioArgs);
+                const versionDir = path.join(paths.out, versionId);
+                await mkdir(versionDir, { recursive: true });
+                const final = uniquePath(path.join(versionDir, `${baseName}_${preset.id}.${enc.ext}`));
+                const tmp = tmpFile(paths.tmp, `.${enc.ext}`);
+                args.push(tmp);
+                const cpu = presetToFfmpegArgs({ ...preset, video: { ...preset.video, useGpu: false } }, this.env, { width: W, height: H, fps: tfps });
+                await this.encode(args, enc.videoArgs, cpu.videoArgs, encodeTimeout(masterProbe.durationFrames, fps), opts.signal);
+                await moveInto(tmp, final);
+                out[target] = final;
+                version.deliverables[target] = final;
+                await saveProject(p);
+                opts.onProgress?.({ stage: 'deliver', done: ++done, total: targets.length, message: `${target}: ${final}` });
             }
-            args.push(...enc.audioArgs);
-            const versionDir = path.join(paths.out, versionId);
-            await mkdir(versionDir, { recursive: true });
-            const final = uniquePath(path.join(versionDir, `${baseName}_${preset.id}.${enc.ext}`));
-            const tmp = tmpFile(paths.tmp, `.${enc.ext}`);
-            args.push(tmp);
-            const cpu = presetToFfmpegArgs({ ...preset, video: { ...preset.video, useGpu: false } }, this.env, { width: W, height: H, fps: tfps });
-            await this.encode(args, enc.videoArgs, cpu.videoArgs, encodeTimeout(masterProbe.durationFrames, fps), opts.signal);
-            await moveInto(tmp, final);
-            out[target] = final;
-            version.deliverables[target] = final;
-            await saveProject(p);
-            opts.onProgress?.({ stage: 'deliver', done: ++done, total: targets.length, message: `${target}: ${final}` });
+        }
+        finally {
+            if (subDir)
+                await rm(subDir, { recursive: true, force: true });
         }
         return out;
     }
@@ -1565,5 +1598,17 @@ async function parallel(items, limit, fn) {
     const rejected = results.find((r) => r.status === 'rejected');
     if (rejected)
         throw rejected.reason;
+}
+const filterCache = new Map();
+/** Whether this ffmpeg build has a filter (e.g. `subtitles` needs libass). */
+export async function hasFilter(ffmpeg, name) {
+    if (!filterCache.has(ffmpeg)) {
+        filterCache.set(ffmpeg, execa(ffmpeg, ['-hide_banner', '-filters'], { reject: false, windowsHide: true, timeout: 30_000 })
+            .then((r) => new Set(String(r.stdout ?? '').split(/\r?\n/).map((l) => /^\s*[A-Z.|]{2,3}\s+(\S+)/.exec(l)?.[1]).filter((x) => !!x))));
+    }
+    return (await filterCache.get(ffmpeg)).has(name);
+}
+function isAsciiPath(s) {
+    return /^[\x20-\x7e]+$/.test(s);
 }
 //# sourceMappingURL=ffmpeg.js.map

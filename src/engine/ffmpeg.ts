@@ -1,8 +1,9 @@
 import { execa, type Options as ExecaOptions } from 'execa';
 import { constants, existsSync } from 'node:fs';
-import { copyFile, link, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { copyFile, link, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
+import os from 'node:os';
 import { performance } from 'node:perf_hooks';
 import type {
   AeBackend,
@@ -45,6 +46,8 @@ import {
 } from '../core/project.js';
 import { splitDissolve } from '../core/timecode.js';
 import { MASTER_PRESET_ID, presetToFfmpegArgs, resolvePreset } from './presets.js';
+import { assFor, captionTargets, projectWords, subtitlesFilter, transcriptsDir } from './captions.js';
+import type { Word } from './transcribe.js';
 
 // ---------- types owned by this module ----------
 
@@ -1395,6 +1398,26 @@ export class Assembler {
     let done = 0;
     opts.onProgress?.({ stage: 'deliver', done: 0, total: targets.length });
 
+    // captions / text overlays: burned into the targets that take them (never into the master)
+    const burnTargets = new Set(captionTargets(p.captions, targets));
+    const burning = targets.some((t) => burnTargets.has(t)) && !!p.captions && (p.captions.enabled || !!p.captions.texts?.length);
+    let words = new Map<string, Word[]>();
+    let subDir: string | undefined;
+    if (burning) {
+      if (!(await hasFilter(this.tools.ffmpeg, 'subtitles'))) {
+        throw new Error('this ffmpeg cannot burn captions (no libass): install an ffmpeg with libass, e.g. `brew install ffmpeg-full` on macOS, or set EDITMCP_FFMPEG');
+      }
+      if (p.captions!.enabled) {
+        words = await projectWords(p, this.tools, transcriptsDir(p), {
+          ...(opts.signal ? { signal: opts.signal } : {}),
+          onTranscribe: (id) => opts.onProgress?.({ stage: 'deliver', done, total: targets.length, message: `transcribing ${id} (whisper)` }),
+        });
+      }
+      if (!isAsciiPath(os.tmpdir())) throw new Error('captions need an ASCII TEMP directory; set TEMP/TMP to an ASCII path');
+      subDir = await mkdtemp(path.join(os.tmpdir(), 'catcut-subs-'));
+    }
+
+    try {
     for (const target of targets) {
       throwIfAborted(opts.signal);
       const preset = resolvePreset(target, p.delivery.overrides?.[target]);
@@ -1416,6 +1439,12 @@ export class Assembler {
         vf.push(...scale);
         // 25p master -> 25i: PsF (flag fields, keep every frame).
         if (preset.video.interlaced) vf.push('setfield=tff');
+      }
+      const ass = subDir && burnTargets.has(target) ? assFor(p, words, { width: W, height: H }) : undefined;
+      if (ass) {
+        const file = path.join(subDir!, `${preset.id}.ass`);
+        await writeFile(file, ass, 'utf8');
+        vf.push(subtitlesFilter(file));
       }
       vf.push('setsar=1');
 
@@ -1440,6 +1469,9 @@ export class Assembler {
       version.deliverables[target] = final;
       await saveProject(p);
       opts.onProgress?.({ stage: 'deliver', done: ++done, total: targets.length, message: `${target}: ${final}` });
+    }
+    } finally {
+      if (subDir) await rm(subDir, { recursive: true, force: true });
     }
     return out;
   }
@@ -1825,4 +1857,19 @@ async function parallel<T>(items: T[], limit: number, fn: (item: T) => Promise<v
   const results = await Promise.allSettled(workers);
   const rejected = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
   if (rejected) throw rejected.reason;
+}
+
+const filterCache = new Map<string, Promise<Set<string>>>();
+
+/** Whether this ffmpeg build has a filter (e.g. `subtitles` needs libass). */
+export async function hasFilter(ffmpeg: string, name: string): Promise<boolean> {
+  if (!filterCache.has(ffmpeg)) {
+    filterCache.set(ffmpeg, execa(ffmpeg, ['-hide_banner', '-filters'], { reject: false, windowsHide: true, timeout: 30_000 })
+      .then((r) => new Set(String(r.stdout ?? '').split(/\r?\n/).map((l) => /^\s*[A-Z.|]{2,3}\s+(\S+)/.exec(l)?.[1]).filter((x): x is string => !!x))));
+  }
+  return (await filterCache.get(ffmpeg)!).has(name);
+}
+
+function isAsciiPath(s: string): boolean {
+  return /^[\x20-\x7e]+$/.test(s);
 }

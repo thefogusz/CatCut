@@ -44,7 +44,7 @@ export interface AeScriptingPref {
 }
 /** "Allow Scripts to Write Files and Access Network" from the newest AE main prefs, read without starting AE. */
 export declare function aeScriptingPref(env?: Record<string, string | undefined>): Promise<AeScriptingPref>;
-/** AE disk cache folder from the newest AE prefs under %APPDATA%; default %LOCALAPPDATA%\Temp; else unknown. */
+/** AE disk cache folder from the newest AE prefs; default %LOCALAPPDATA%\Temp (~/Library/Caches on macOS); else unknown. */
 export declare function findAeDiskCache(env?: Record<string, string | undefined>): Promise<Omit<AeCacheInfo, 'bytes' | 'partial' | 'dirs'>>;
 export interface DiskReport {
     drives: DriveSpace[];

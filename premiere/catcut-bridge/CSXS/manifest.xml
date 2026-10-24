@@ -5,10 +5,10 @@
   - com.catcut.bridge.panel: Window > Extensions > CatCut Bridge, a status view and fallback if auto-start
     does not fire on some Premiere version. Only one instance serves the queue (bridge-core.js lock).
 -->
-<ExtensionManifest Version="7.0" ExtensionBundleId="com.catcut.bridge" ExtensionBundleVersion="0.3.0" ExtensionBundleName="CatCut Bridge" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<ExtensionManifest Version="7.0" ExtensionBundleId="com.catcut.bridge" ExtensionBundleVersion="0.3.1" ExtensionBundleName="CatCut Bridge" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
-    <Extension Id="com.catcut.bridge.auto" Version="0.3.0"/>
-    <Extension Id="com.catcut.bridge.panel" Version="0.3.0"/>
+    <Extension Id="com.catcut.bridge.auto" Version="0.3.1"/>
+    <Extension Id="com.catcut.bridge.panel" Version="0.3.1"/>
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>

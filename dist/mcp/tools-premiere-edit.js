@@ -8,9 +8,9 @@
 import { createHash } from 'node:crypto';
 import { constants, existsSync } from 'node:fs';
 import { copyFile, mkdir, readdir, rename, rm, stat } from 'node:fs/promises';
-import os from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
+import { localAppDataDir } from '../core/platform.js';
 import { uniqueOutputPath } from '../engine/aerender.js';
 import { stagePath } from '../engine/premiere.js';
 import { client, closeHint, ensureProject } from './tools-premiere.js';
@@ -55,7 +55,7 @@ const projectArg = z.string().describe('full path of the .prproj (opened when ne
 const timeoutArg = z.number().int().min(10).max(3600).optional().describe('seconds to wait for Premiere (default 180)');
 // ---------- checkpoints ----------
 function backupDir(projectPath) {
-    const root = join(process.env['LOCALAPPDATA'] ?? join(os.homedir(), 'AppData', 'Local'), 'CatCut', 'premiere-backups');
+    const root = join(localAppDataDir(), 'CatCut', 'premiere-backups');
     const id = createHash('sha1').update(resolve(projectPath).toLowerCase()).digest('hex').slice(0, 8);
     return join(root, `${basename(projectPath, '.prproj').replace(/[^\w.-]+/g, '_')}-${id}`);
 }
@@ -92,7 +92,7 @@ async function defaultPreset(premiereExe) {
     return undefined;
 }
 function outDirFor(state, kind, seq) {
-    const base = state.project ? join(state.project.dir, 'review', kind) : join(process.env['LOCALAPPDATA'] ?? os.tmpdir(), 'CatCut', kind);
+    const base = state.project ? join(state.project.dir, 'review', kind) : join(localAppDataDir(), 'CatCut', kind);
     return join(base, `${seq.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')}-${stampNow()}`);
 }
 export const PREMIERE_EDIT_TOOLS = [

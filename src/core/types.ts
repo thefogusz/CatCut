@@ -234,6 +234,39 @@ export interface ReviewPlan {
   cuts?: Cut[]; // transition context for annotations near a cut
 }
 
+// ---------- captions / on-screen text (Reels / TikTok style) ----------
+
+/** Text burned into deliverables over the picture, e.g. a hook in the first seconds. */
+export interface TextOverlay {
+  id: string;
+  text: string; // \n for a line break
+  at: Frames;
+  dur: Frames;
+  style?: 'hook' | 'title' | 'lower'; // hook: big, top · title: big, centre · lower: small, lower third
+}
+
+/**
+ * Auto captions from speech (whisper.cpp) and text overlays. Burned into deliverables only; the ProRes
+ * master stays clean. Word timings come from cached transcripts of the sources (cache/transcripts/).
+ */
+export interface CaptionSettings {
+  enabled: boolean; // speech captions on/off (overlays in `texts` burn either way)
+  source?: 'auto' | 'clips' | 'vo'; // whose speech: camera audio of video clips or the VO track (auto: vo when present)
+  lang?: string; // whisper language: 'th', 'en', … or 'auto' (default)
+  style?: 'pop' | 'clean'; // pop: word-by-word highlight (TikTok); clean: whole phrase
+  position?: 'bottom' | 'middle' | 'top';
+  font?: string; // font family; default per OS with Thai glyphs
+  fontScale?: number; // 1 = default size
+  color?: string; // '#RRGGBB'
+  highlight?: string; // active word colour (pop)
+  uppercase?: boolean; // Latin letters only
+  maxWords?: number; // Latin words per caption (default 3)
+  maxChars?: number; // visible characters per caption (default 12; Thai vowel/tone marks do not count)
+  fixes?: Array<{ from: string; to: string }>; // corrections applied to transcripts (brand names, misheard words)
+  targets?: DeliveryTargetId[]; // default: every target except broadcast/master (th_tv, th_prores, m422hq)
+  texts?: TextOverlay[];
+}
+
 export interface Project {
   meta: ProjectMeta;
   dir: string; // absolute project directory (holds project.json, cache/, out/)
@@ -244,6 +277,7 @@ export interface Project {
   board?: Board;
   constraints?: Constraint[];
   styleRules?: StyleRules;
+  captions?: CaptionSettings;
 }
 
 // ---------- delivery presets ----------

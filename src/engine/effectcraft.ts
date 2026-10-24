@@ -23,6 +23,7 @@ import type {
 } from '../core/types.js';
 import { hashFile, hashJson } from '../core/hash.js';
 import { isAscii, killTree, moveFile, uniqueOutputPath, type SpawnFn } from './aerender.js';
+import { freeRamBytes } from '../core/platform.js';
 
 /** EffectCraft / FilmCraft time unit: divides evenly by every common frame and sample rate. */
 const TICKS_PER_SECOND = 254_016_000_000;
@@ -124,7 +125,7 @@ export function createEffectCraftBackend(tools: ToolPaths, opts: EffectCraftOpti
     const exe = tools.effectcraftCli;
     if (!exe) throw new Error('effectcraft-cli not found; install EffectCraft or set EDITMCP_EFFECTCRAFT_DIR');
     const minRam = opts.minFreeRamGb ?? 0.75;
-    if (os.freemem() / 2 ** 30 < minRam) throw new Error(`not enough free RAM for EffectCraft (need ${minRam} GB)`);
+    if (freeRamBytes() / 2 ** 30 < minRam) throw new Error(`not enough free RAM for EffectCraft (need ${minRam} GB)`);
     if (signal?.aborted) throw new Error('aborted');
     const child = spawn(exe, args, { reject: false, windowsHide: true, timeout: 0, stdin: 'ignore' });
     let timedOut = false;

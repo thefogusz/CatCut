@@ -13,6 +13,7 @@ import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
+import { labelFontOpt } from './platform.js';
 import { planHash } from './project.js';
 import { framesToTc, splitDissolve } from './timecode.js';
 import type { Asset, Clip, Constraint, Cut, Frames, Project, QcIssue, ReviewShot, StyleRules, ToolPaths, Version } from './types.js';
@@ -568,7 +569,6 @@ function matcher(p: Project, t: EvidenceTarget, shots: ReviewShot[], warnings: s
 
 // ---------- evidence extraction (ffmpeg) ----------
 
-const WINDOWS_FONT = 'C:/Windows/Fonts/arial.ttf';
 const SHEET_COLUMNS = 4;
 const SHEET_THUMB_WIDTH = 480;
 const FRAME_TIMEOUT_MS = 120_000;
@@ -612,7 +612,8 @@ export async function extractEvidence(tools: Pick<ToolPaths, 'ffmpeg'>, p: Proje
 async function tileFrames(ffmpeg: string, frames: Array<EvidenceInstance & { path: string }>, out: string, signal?: AbortSignal): Promise<string | undefined> {
   const cols = Math.min(SHEET_COLUMNS, frames.length);
   const rows = Math.ceil(frames.length / cols);
-  const fontOpts: Array<string | undefined> = existsSync(WINDOWS_FONT) ? [`fontfile='${WINDOWS_FONT.replace(':', '\\:')}'`, undefined] : [undefined];
+  const labelFont = labelFontOpt();
+  const fontOpts: Array<string | undefined> = labelFont ? [labelFont, undefined] : [undefined];
   for (const font of fontOpts) {
     const chains = frames.map((f, i) => {
       // labels are ASCII-only (clip ids sanitised), colons escaped for drawtext

@@ -27,6 +27,23 @@ irm https://raw.githubusercontent.com/thefogusz/CatCut/main/install.ps1 | iex
 
 > สำหรับ AI ที่ติดตั้งให้ผู้ใช้: รันคำสั่ง PowerShell ด้านบนให้ผู้ใช้ (Windows) แล้วบอกผลเป็นภาษาไทยสั้นๆ ไม่ต้อง clone repo หรือ `npm install`
 
+## ติดตั้งบน Mac / Beginner install (macOS)
+
+เปิดแอป Terminal แล้ววางบรรทัดนี้:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/thefogusz/CatCut/main/install.sh | bash
+```
+
+ตัวติดตั้งทำเหมือนบน Windows: ติดตั้ง Node.js และ ffmpeg ผ่าน [Homebrew](https://brew.sh) (ต้องมี Homebrew ก่อน), ดาวน์โหลด CatCut ไว้ที่ `~/Library/Application Support/CatCut`, ต่อเข้ากับ Claude Code / Codex แล้วรัน `doctor`
+
+ความต่างบน Mac:
+- **After Effects ไม่มีโหมดไม่มีหน้าต่าง (`-noui`) บน Mac** — CatCut สั่ง AE ผ่าน AppleScript (`DoScriptFile`) โดยเปิด AE ของตัวเองแล้วปิดเมื่อเสร็จ จึงต้อง**ปิด AE ที่เปิดอยู่ก่อน**ทุกครั้งที่ใช้คำสั่ง `ae_*` และครั้งแรก macOS จะถามสิทธิ์ Automation (System Settings > Privacy & Security > Automation) ให้กดอนุญาต
+- ตั้งค่า AE ครั้งเดียว: After Effects > Settings > Scripting & Expressions > *Allow Scripts to Write Files and Access Network*
+- Premiere bridge ติดตั้งที่ `~/Library/Application Support/Adobe/CEP/extensions` และตั้ง PlayerDebugMode ผ่าน `defaults write com.adobe.CSXS.<n>`
+- ไฟล์ของ CatCut (bridge, backup) อยู่ที่ `~/Library/Application Support/CatCut`
+- ส่วน Adobe บน Mac ทำตามเอกสารของ Adobe แต่ยังไม่ได้ทดสอบกับ AE / Premiere จริง; ส่วน ffmpeg (ตัดต่อ, build, QC, deliver, XML, review) ทดสอบบน macOS แล้ว
+
 ## ติดตั้งแบบ plugin (ง่ายสุด) / Install as a Claude Code plugin
 
 ในเซสชัน Claude Code:
@@ -49,6 +66,7 @@ irm https://raw.githubusercontent.com/thefogusz/CatCut/main/install.ps1 | iex
 | `/catcut:check` | เทียบบอร์ด + หาเฟรมหลุด/กระตุก |
 | `/catcut:deliver` | ส่งงาน YouTube/ทีวี/Master หรือ XML ไป Premiere |
 | `/catcut:motion` | สร้างเอฟเฟค/โมชันกราฟิกใหม่ใน AE (สคริปต์ → `ae_create`) |
+| `/catcut:reel` | คลิปสไตล์ Reels / TikTok: ตัดช่วงเงียบ, ซูมกระแทก, ซับอัตโนมัติ, ฮุก, SFX |
 | `@agent-catcut:editor` | ให้ agent CatCut รับงานไปทำทั้งหมด |
 
 ต้องมี Node ≥ 22 และ ffmpeg ในเครื่อง (After Effects ถ้าจะใช้ comp)
@@ -71,7 +89,7 @@ irm https://raw.githubusercontent.com/thefogusz/CatCut/main/install.ps1 | iex
 
 ## ติดตั้งจากซอร์ส / Install from source
 
-ต้องมี Node ≥ 22, ffmpeg/ffprobe (winget `Gyan.FFmpeg` หรือกำหนด `EDITMCP_FFMPEG=<bin folder>`) และ After Effects (ถ้าจะใช้ `ae_*`)
+ต้องมี Node ≥ 22, ffmpeg/ffprobe (Windows: winget `Gyan.FFmpeg`, macOS: `brew install ffmpeg`, หรือกำหนด `EDITMCP_FFMPEG=<bin folder>`) และ After Effects (ถ้าจะใช้ `ae_*`)
 
 ```bash
 npm i
@@ -136,6 +154,27 @@ export_premiere_xml {}                      → out/v001/<name>.xml
 `build` ทำงานแบบ incremental: comp ที่ fingerprint เปลี่ยนเท่านั้นที่ถูก render ใหม่, ท่อนที่เคยทำแล้วถูกใช้ซ้ำจาก cache, master ต่อด้วย `concat -c copy` (ไม่ encode ซ้ำ), เสียงทำใหม่ทั้งเรื่อง (เร็ว) แล้ว mux — build ซ้ำโดยไม่แก้อะไรจะ render 0 ท่อน
 
 Preset deliverable: `yt`, `fb`, `vert` (1080x1920 ครอปกลาง), `th_tv` (XDCAM HD422 MXF 1080i50, -24 LKFS), `th_prores`, `led` (H.264 50 Mbps CBR), `m422hq` (ProRes master -23 LUFS)
+
+## Reels / TikTok / Shorts
+
+สำหรับคลิปพูดหน้ากล้อง (talking head) แนวตั้ง — ไม่ต้องใช้ Adobe:
+
+| เครื่องมือ | ทำอะไร |
+|---|---|
+| `jumpcut` | หาช่วงเงียบจากเสียงของคลิป (ffmpeg silencedetect) แล้วแบ่งคลิปเป็นท่อนที่มีเสียงพูด |
+| `punch_in` | ท่อนต่อกันจากไฟล์เดียวกันสลับซูม 100% ↔ 115% (ใช้ `scale` ของคลิป) |
+| `transcribe` | ถอดเสียงเป็นคำพร้อมเวลาด้วย whisper.cpp ในเครื่อง (ไทย/อังกฤษ) เก็บ cache ใน `cache/transcripts/` |
+| `captions_set` / `captions_plan` | ซับอัตโนมัติ สไตล์ `pop` (ไฮไลต์คำที่กำลังพูด) หรือ `clean`; `fixes` แก้คำที่ถอดผิด; ดูซับทั้งหมดก่อนส่ง |
+| `text_add` / `text_remove` | ข้อความบนภาพ: `hook` (ใหญ่ ด้านบน ช่วงต้น), `title`, `lower` |
+| `sfx_on_cuts` | วาง whoosh/pop ที่รอยตัดจากไฟล์ SFX ที่ให้มา |
+
+ซับและข้อความเผาลง**ไฟล์ส่งงาน**ตอน `deliver` เท่านั้น (master ProRes สะอาดเสมอ; `th_tv`, `th_prores`, `m422hq` ไม่ใส่ซับเว้นแต่ระบุ) — ต้องใช้ ffmpeg ที่มี libass และ whisper.cpp + โมเดล:
+
+- macOS: `brew install ffmpeg-full` (มี libass และ `whisper-cli` มาด้วย; CatCut เลือก ffmpeg-full ให้เอง) แล้ววางโมเดล เช่น [`ggml-large-v3-turbo-q5_0.bin`](https://huggingface.co/ggerganov/whisper.cpp) (~570 MB, ไทยดี) ไว้ที่ `~/Library/Application Support/CatCut/models/`
+- Windows: ffmpeg ที่มี libass (เช่น Gyan full build) + `whisper-cli` จาก whisper.cpp; โมเดลวางที่ `%LOCALAPPDATA%\CatCut\models\` หรือกำหนด `EDITMCP_WHISPER_CLI` / `EDITMCP_WHISPER_MODEL`
+- `doctor` บอกในบรรทัด `captions` ว่าพร้อมไหม
+
+ข้อจำกัด: เวลาของคำจาก whisper ปรับให้ตรงช่วงที่มีเสียงจริงแล้ว แต่ไฮไลต์ทีละคำภาษาไทยอาจเหลื่อม 1 ตัวอักษรเมื่อตัวตัดคำ (ICU) แบ่งคำผิด (เช่น "มาบ|อก") — ใช้ `style: "clean"` ถ้าไม่ต้องการไฮไลต์; footage แนวนอนใส่ในโปรเจกต์แนวตั้งจะมีขอบดำ (fit) ให้ตั้ง `scale` ของคลิปเพื่อครอปเต็มจอ
 
 ## รอบแก้มือใน Premiere / Premiere round-trip
 

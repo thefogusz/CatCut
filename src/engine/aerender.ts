@@ -7,7 +7,7 @@
  * - Never overwrites: an existing target gets a `_2`, `_3`… suffix.
  * - Every process spawn goes through an injectable `spawn` (default: execa) so tests
  *   can fake aerender while still running real ffmpeg/ffprobe.
- * - Timeout / abort → the whole process tree is killed (taskkill /T /F on Windows).
+ * - Timeout / abort → the whole process tree is killed (taskkill /T /F on Windows, ps + SIGKILL elsewhere).
  * - Refuses to start when the output or AE-cache drive is nearly full; retries once when aerender
  *   crashes before rendering its first frame (never after a timeout or abort).
  */
@@ -18,6 +18,7 @@ import os from 'node:os';
 import { basename, dirname, extname, join, parse, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import type { AeBackend, Frames, Progress, RenderRequest, RenderResult, ToolPaths } from '../core/types.js';
+import { freeRamBytes, listPosixProcesses, ownTree } from '../core/platform.js';
 import { tcToFrames } from '../core/timecode.js';
 
 export type SpawnFn = typeof execa;
@@ -100,9 +101,11 @@ export async function freeDiskBytes(path: string, statfs: StatfsFn = (p) => fsSt
   return Number(s.bavail) * Number(s.bsize);
 }
 
-/** Folder on the drive AE's disk cache uses: EDITMCP_AE_CACHE_DIR, else %LOCALAPPDATA% (AE's default lives under it). */
+/** Folder on the drive AE's disk cache uses: EDITMCP_AE_CACHE_DIR, else %LOCALAPPDATA% / ~/Library/Caches (AE's default lives under it). */
 export function defaultAeCacheDir(): string {
-  return process.env['EDITMCP_AE_CACHE_DIR'] || process.env['LOCALAPPDATA'] || os.tmpdir();
+  if (process.env['EDITMCP_AE_CACHE_DIR']) return process.env['EDITMCP_AE_CACHE_DIR'];
+  if (process.platform === 'darwin') return join(os.homedir(), 'Library', 'Caches');
+  return process.env['LOCALAPPDATA'] || os.tmpdir();
 }
 
 /** ProRes 422 HQ ≈ 0.45 byte/pixel/frame; the Lossless fallback writes ~4 bytes/pixel before the transcode. */
@@ -203,7 +206,7 @@ export function isMissingOmTemplate(error: unknown, userStrings: string[] = []):
 }
 
 /** -mfr percentage for builds: 90 per the design, scaled down when free RAM is low. */
-export function defaultMfrPercent(freeGb: number = os.freemem() / 2 ** 30): number {
+export function defaultMfrPercent(freeGb: number = freeRamBytes() / 2 ** 30): number {
   if (freeGb >= 16) return 90;
   if (freeGb >= 8) return 70;
   if (freeGb >= 4) return 50;
@@ -269,6 +272,13 @@ export async function killTree(pid: number | undefined, spawn: SpawnFn, child?: 
     try {
       await spawn('taskkill', ['/T', '/F', '/PID', String(pid)], { reject: false, windowsHide: true, timeout: 10_000 });
     } catch { /* already gone */ }
+  } else if (pid) {
+    // aerender on macOS starts its own render process: kill every descendant, not only the child
+    try {
+      for (const p of ownTree(pid, await listPosixProcesses())) {
+        try { process.kill(p, 'SIGKILL'); } catch { /* already gone */ }
+      }
+    } catch { /* ps unavailable */ }
   }
   try { child?.kill?.('SIGKILL'); } catch { /* ignore */ }
 }
@@ -414,7 +424,7 @@ async function removeTempOutputs(dir: string, prefix: string): Promise<void> {
  */
 export async function aerender(tools: ToolPaths, req: AerenderRequest, opts: AerenderOptions = {}): Promise<RenderResult> {
   const spawn: SpawnFn = opts.spawn ?? execa;
-  if (!tools.aerender) throw new Error('aerender.exe not found (ToolPaths.aerender). Install After Effects or set EDITMCP_AE_DIR.');
+  if (!tools.aerender) throw new Error('aerender not found (ToolPaths.aerender). Install After Effects or set EDITMCP_AE_DIR.');
   if (!existsSync(req.aep)) throw new Error(`project not found: ${req.aep}`);
   const { startFrame, endFrame } = req;
   if (startFrame === undefined || endFrame === undefined || !Number.isInteger(startFrame) || !Number.isInteger(endFrame) || startFrame < 0) {
@@ -453,7 +463,7 @@ async function renderOnce(tools: ToolPaths, req: AerenderRequest, spawn: SpawnFn
 
   try {
     req.signal?.throwIfAborted();
-    const freeGb = os.freemem() / 2 ** 30;
+    const freeGb = freeRamBytes() / 2 ** 30;
     const minFree = req.minFreeRamGb ?? 0.75;
     if (freeGb < minFree) {
       const msg = `low free RAM: ${freeGb.toFixed(2)} GB (< ${minFree} GB)`;

@@ -18,8 +18,9 @@
   var cep = window.__adobe_cep__;
   var show = function (id, text) { var el = document.getElementById(id); if (el) el.textContent = text; };
   try {
-    // getSystemPath(1) = extension folder, as a file URL (same decoding as Adobe's CSInterface)
-    var ext = decodeURI(cep.getSystemPath('extension')).replace(/^file:\/{2,3}/, '');
+    // getSystemPath(1) = extension folder, as a file URL (same decoding as Adobe's CSInterface):
+    // file:///C:/… → C:/…, file:///Users/… → /Users/… (macOS keeps its leading slash)
+    var ext = decodeURI(cep.getSystemPath('extension')).replace(/^file:\/\/(\/(?=[A-Za-z]:))?/, '');
     var path = require('path'), fs = require('fs'), os = require('os');
     // the version CatCut compares against: read once, the code below is what this Premiere session runs
     var VERSION = JSON.parse(fs.readFileSync(path.join(ext, 'package.json'), 'utf8')).version;
@@ -28,8 +29,10 @@
     var bridge = core.createBridge({
       // same folder CatCut uses (premiere.ts defaultQueueDir): not under TEMP, which cleanup tools empty
       fs: fs, path: path, pid: process.pid, version: VERSION,
-      dir: process.env.CATCUT_PREMIERE_BRIDGE_DIR || (process.env.LOCALAPPDATA && /^[\x20-\x7e]+$/.test(process.env.LOCALAPPDATA)
-        ? path.join(process.env.LOCALAPPDATA, 'CatCut', 'bridge') : path.join(os.tmpdir(), 'catcut-premiere-bridge')),
+      dir: process.env.CATCUT_PREMIERE_BRIDGE_DIR || (function () {
+        var local = process.platform === 'darwin' ? path.join(os.homedir(), 'Library', 'Application Support') : process.env.LOCALAPPDATA;
+        return local && /^[\x20-\x7e]+$/.test(local) ? path.join(local, 'CatCut', 'bridge') : path.join(os.tmpdir(), 'catcut-premiere-bridge');
+      })(),
       hostFile: path.join(ext, 'host.jsx'),
       evalScript: function (script) { return new Promise(function (resolve) { cep.evalScript(script, resolve); }); },
       onStatus: function (st) {

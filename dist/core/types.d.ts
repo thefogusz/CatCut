@@ -206,6 +206,38 @@ export interface ReviewPlan {
     shots: ReviewShot[];
     cuts?: Cut[];
 }
+/** Text burned into deliverables over the picture, e.g. a hook in the first seconds. */
+export interface TextOverlay {
+    id: string;
+    text: string;
+    at: Frames;
+    dur: Frames;
+    style?: 'hook' | 'title' | 'lower';
+}
+/**
+ * Auto captions from speech (whisper.cpp) and text overlays. Burned into deliverables only; the ProRes
+ * master stays clean. Word timings come from cached transcripts of the sources (cache/transcripts/).
+ */
+export interface CaptionSettings {
+    enabled: boolean;
+    source?: 'auto' | 'clips' | 'vo';
+    lang?: string;
+    style?: 'pop' | 'clean';
+    position?: 'bottom' | 'middle' | 'top';
+    font?: string;
+    fontScale?: number;
+    color?: string;
+    highlight?: string;
+    uppercase?: boolean;
+    maxWords?: number;
+    maxChars?: number;
+    fixes?: Array<{
+        from: string;
+        to: string;
+    }>;
+    targets?: DeliveryTargetId[];
+    texts?: TextOverlay[];
+}
 export interface Project {
     meta: ProjectMeta;
     dir: string;
@@ -216,6 +248,7 @@ export interface Project {
     board?: Board;
     constraints?: Constraint[];
     styleRules?: StyleRules;
+    captions?: CaptionSettings;
 }
 export interface DeliveryPreset {
     id: DeliveryTargetId;

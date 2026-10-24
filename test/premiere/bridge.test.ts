@@ -222,7 +222,9 @@ describe('bridge queue (bridge-core.js ⇄ CatCut client)', () => {
 
 async function toolState(prem: ReturnType<typeof fakePremiere>) {
   const live = await liveBridge(prem);
-  const { env } = await safeEnvironment();
+  const { env: real } = await safeEnvironment();
+  // a Premiere install is part of the fixture (the host is mocked), not of the machine running the tests
+  const env = { ...real, tools: { ...real.tools, premiereExe: join(os.tmpdir(), 'Adobe Premiere Pro.exe') } };
   const state: AppState = {
     env, ae: new MockAeBackend(), jobs: new JobManager(), problems: [],
     assembler: { build: async () => { throw new Error('no build'); }, deliver: async () => ({}), reviewProxy: async () => '' },
@@ -304,7 +306,7 @@ describe('premiere-bridge install', () => {
     await mkdir(join(extensionsDir, BRIDGE_ID), { recursive: true });
     await writeFile(join(extensionsDir, BRIDGE_ID, 'stale.js'), 'old');
     const spawn = vi.fn(async () => ({ exitCode: 0, stdout: '', stderr: '' }));
-    const r = await installBridge({ spawn: spawn as unknown as SpawnFn, extensionsDir, source: BRIDGE_SRC });
+    const r = await installBridge({ spawn: spawn as unknown as SpawnFn, extensionsDir, source: BRIDGE_SRC, platform: 'win32' });
     expect(r.installedTo).toBe(join(extensionsDir, BRIDGE_ID));
     for (const f of ['CSXS/manifest.xml', 'index.html', 'bridge-core.js', 'host.jsx']) expect(existsSync(join(r.installedTo, f))).toBe(true);
     expect(existsSync(join(r.installedTo, 'stale.js'))).toBe(false);
@@ -315,6 +317,17 @@ describe('premiere-bridge install', () => {
     expect(opts['shell']).toBeUndefined();
     await uninstallBridge({ extensionsDir });
     expect(existsSync(join(extensionsDir, BRIDGE_ID))).toBe(false);
+  });
+
+  it('macOS: sets PlayerDebugMode in the com.adobe.CSXS.<n> user defaults instead of the registry', async () => {
+    const root = await mkdtemp(join(os.tmpdir(), 'catcut-ppro-'));
+    const spawn = vi.fn(async () => ({ exitCode: 0, stdout: '', stderr: '' }));
+    const r = await installBridge({ spawn: spawn as unknown as SpawnFn, extensionsDir: join(root, 'extensions'), source: BRIDGE_SRC, backupRoot: join(root, 'backups'), platform: 'darwin' });
+    expect(r.debugModeKeys).toEqual(['com.adobe.CSXS.9', 'com.adobe.CSXS.10', 'com.adobe.CSXS.11', 'com.adobe.CSXS.12']);
+    const [bin, args, opts] = spawn.mock.calls[0] as unknown as [string, string[], Record<string, unknown>];
+    expect(bin).toBe('defaults');
+    expect(args).toEqual(['write', 'com.adobe.CSXS.9', 'PlayerDebugMode', '1']);
+    expect(opts['shell']).toBeUndefined();
   });
 
   it('manifest: invisible auto-start extension plus a visible fallback panel, Premiere host, Node enabled', () => {

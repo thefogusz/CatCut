@@ -21,6 +21,7 @@ const INSTRUCTIONS = [
   'New AE comps: write a JSX build script and run ae_create (never launch AfterFX/aerender/ffmpeg yourself, never write into out/). Long jobs: job_wait {id}, never sleep-poll.',
   'EffectCraft (ArtCraft): ae_create with saveAs *.ecproj builds the comp in EffectCraft instead of After Effects; every ae_* tool and build accept .ecproj. Use match-name property paths and new TextDocument(...) so a script runs in both hosts.',
   'Review: review_open (returns the URL) → user selects shots/ranges and annotates → review_notes. Propose edits from submitted notes before applying them. Evidence for notes: rules_evidence {clipIds, offsets}.',
+  'Reels / TikTok (talking head): jumpcut → punch_in → transcribe → captions_set + captions_plan (proofread, fix with captions_set {fixes}) → text_add (hook) → sfx_on_cuts → build → deliver vert. Timeline tools are dry runs until apply: true; captions/text burn into deliverables only.',
   'Builds are incremental: unchanged segments are never re-encoded; outputs are never overwritten (new version each build).',
 ].join('\n');
 

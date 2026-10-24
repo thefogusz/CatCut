@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { hashFile, hashJson } from '../core/hash.js';
 import { isAscii, killTree, moveFile, uniqueOutputPath } from './aerender.js';
+import { freeRamBytes } from '../core/platform.js';
 /** EffectCraft / FilmCraft time unit: divides evenly by every common frame and sample rate. */
 const TICKS_PER_SECOND = 254_016_000_000;
 const MARK = '@@CATCUT@@';
@@ -109,7 +110,7 @@ export function createEffectCraftBackend(tools, opts = {}) {
         if (!exe)
             throw new Error('effectcraft-cli not found; install EffectCraft or set EDITMCP_EFFECTCRAFT_DIR');
         const minRam = opts.minFreeRamGb ?? 0.75;
-        if (os.freemem() / 2 ** 30 < minRam)
+        if (freeRamBytes() / 2 ** 30 < minRam)
             throw new Error(`not enough free RAM for EffectCraft (need ${minRam} GB)`);
         if (signal?.aborted)
             throw new Error('aborted');

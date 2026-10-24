@@ -5,6 +5,7 @@
  */
 import { execa } from 'execa';
 import { readdir } from 'node:fs/promises';
+import os from 'node:os';
 import { basename, extname, join, resolve } from 'node:path';
 import { clipStartFrames } from '../core/project.js';
 const QC_KIND = {
@@ -124,6 +125,13 @@ export async function lintComps(backend, targets, project, opts = {}) {
     opts.onProgress?.({ stage: 'comp_lint', done, total: targets.length });
     return report;
 }
+/** macOS font folders (user, local, system, Adobe's own). Fonts in subfolders (Supplemental) are listed too. */
+function macFontDirs(home) {
+    return [
+        join(home, 'Library', 'Fonts'), '/Library/Fonts', '/System/Library/Fonts', '/System/Library/Fonts/Supplemental',
+        '/Library/Application Support/Adobe/Fonts',
+    ];
+}
 const FONT_KEYS = [
     'HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts',
     'HKCU\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts',
@@ -153,7 +161,7 @@ async function defaultReadDir(dir) {
         return [];
     }
 }
-/** Fonts Windows (and AE's own Adobe Fonts folder) can see: HKLM/HKCU registry + font folders. */
+/** Fonts the OS (and AE's own Adobe Fonts folder) can see: HKLM/HKCU registry + font folders on Windows, font folders on macOS. */
 export async function listInstalledFonts(src = {}) {
     const env = src.env ?? process.env;
     const regQuery = src.regQuery ?? defaultRegQuery;
@@ -170,7 +178,7 @@ export async function listInstalledFonts(src = {}) {
                 names.push(basename(r.file, extname(r.file)));
         }
     }
-    const dirs = [
+    const dirs = (src.platform ?? process.platform) === 'darwin' ? macFontDirs(env['HOME'] ?? os.homedir()) : [
         join(env['WINDIR'] ?? env['SystemRoot'] ?? 'C:\\Windows', 'Fonts'),
         ...(env['LOCALAPPDATA'] ? [join(env['LOCALAPPDATA'], 'Microsoft', 'Windows', 'Fonts')] : []),
         join(env['CommonProgramFiles'] ?? 'C:\\Program Files\\Common Files', 'Adobe', 'Fonts'),

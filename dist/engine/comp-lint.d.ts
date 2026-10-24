@@ -45,13 +45,15 @@ export interface FontSources {
     /** file names in a directory ([] when missing) */
     readDir?: (dir: string) => Promise<string[]>;
     env?: Record<string, string | undefined>;
+    /** which OS's font folders to scan (default: this one) */
+    platform?: NodeJS.Platform;
 }
 /** `reg query` value lines: "    Arial Bold (TrueType)    REG_SZ    arialbd.ttf". */
 export declare function parseRegFonts(out: string): Array<{
     name: string;
     file: string;
 }>;
-/** Fonts Windows (and AE's own Adobe Fonts folder) can see: HKLM/HKCU registry + font folders. */
+/** Fonts the OS (and AE's own Adobe Fonts folder) can see: HKLM/HKCU registry + font folders on Windows, font folders on macOS. */
 export declare function listInstalledFonts(src?: FontSources): Promise<InstalledFonts>;
 /** Lowercase letters+digits only, without "(TrueType)"-style tags. */
 export declare function normalizeFontName(s: string): string;

@@ -11,6 +11,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import { lstat, mkdir, opendir, readdir, readFile, rename, rmdir, statfs as fsStatfs, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { hashJson } from '../core/hash.js';
+import { adobePrefsDir } from '../core/platform.js';
 import { isProtected } from '../core/project.js';
 import type { Project, QcIssue, Version } from '../core/types.js';
 
@@ -48,9 +49,14 @@ export interface DriveSpace {
   error?: string;
 }
 
+/** Windows absolute path ("D:\\job", "\\\\server\\share"). */
+const WIN_ABS = /^(?:[A-Za-z]:[\\/]|\\\\)/;
+
 async function freeSpace(target: string, statfs: StatFsFn): Promise<{ free: number; total: number }> {
-  let p = path.resolve(target);
-  while (!existsSync(p)) {
+  // a Windows-style path on another OS is passed as is (statfs reports it unreadable), never resolved against cwd
+  const foreign = process.platform !== 'win32' && WIN_ABS.test(target);
+  let p = foreign ? target : path.resolve(target);
+  while (!foreign && !existsSync(p)) {
     const up = path.dirname(p);
     if (up === p) break;
     p = up;
@@ -60,8 +66,11 @@ async function freeSpace(target: string, statfs: StatFsFn): Promise<{ free: numb
   return { free: Number(s.bavail) * bsize, total: Number(s.blocks) * bsize };
 }
 
+/** Drive a path lives on: "C:\\" for Windows-style paths (on any OS), the volume ("/Volumes/X/") or "/" on macOS. */
 function driveRoot(p: string): string {
-  return path.parse(path.resolve(p)).root.toUpperCase();
+  if (WIN_ABS.test(p) || process.platform === 'win32') return path.win32.parse(path.win32.resolve(p)).root.toUpperCase();
+  const abs = path.resolve(p);
+  return /^\/Volumes\/[^/]+/.exec(abs)?.[0].concat('/') ?? path.parse(abs).root;
 }
 
 // ---------- AE disk cache ----------
@@ -102,11 +111,12 @@ function versionKey(v: string): number[] {
   return v.split('.').map((x) => parseInt(x, 10) || 0);
 }
 
-/** AE prefs version folders under %APPDATA%, newest first, with their "*Prefs*.txt" files. */
+/** AE prefs version folders under %APPDATA% (or ~/Library/Preferences on macOS), newest first, with their "*Prefs*.txt" files. */
 async function aePrefsDirs(env: Record<string, string | undefined>): Promise<Array<{ ver: string; dir: string; files: string[] }>> {
   const appdata = env['APPDATA'];
-  if (!appdata) return [];
-  const root = path.join(appdata, 'Adobe', 'After Effects');
+  const adobe = appdata ? path.join(appdata, 'Adobe') : process.platform === 'darwin' && env['HOME'] ? adobePrefsDir(env, 'darwin', env['HOME']) : undefined;
+  if (!adobe) return [];
+  const root = path.join(adobe, 'After Effects');
   const versions = (await readdir(root).catch(() => [] as string[])).filter((v) => /^\d+(\.\d+)*$/.test(v))
     .sort((a, b) => { const x = versionKey(a); const y = versionKey(b); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (y[i] ?? 0) - (x[i] ?? 0); if (d) return d; } return 0; });
   const out = [];
@@ -137,7 +147,7 @@ export async function aeScriptingPref(env: Record<string, string | undefined> = 
   return {};
 }
 
-/** AE disk cache folder from the newest AE prefs under %APPDATA%; default %LOCALAPPDATA%\Temp; else unknown. */
+/** AE disk cache folder from the newest AE prefs; default %LOCALAPPDATA%\Temp (~/Library/Caches on macOS); else unknown. */
 export async function findAeDiskCache(env: Record<string, string | undefined> = process.env): Promise<Omit<AeCacheInfo, 'bytes' | 'partial' | 'dirs'>> {
   for (const { ver, dir, files } of await aePrefsDirs(env)) {
     for (const f of files) {
@@ -162,6 +172,9 @@ export async function findAeDiskCache(env: Record<string, string | undefined> = 
   }
   const local = env['LOCALAPPDATA'];
   if (local && existsSync(path.join(local, 'Temp'))) return { folder: path.join(local, 'Temp'), source: 'default' };
+  // macOS default: ~/Library/Caches/Adobe/After Effects/<ver>/Disk Cache…
+  const caches = env['HOME'] ? path.join(env['HOME'], 'Library', 'Caches') : undefined;
+  if (!local && caches && process.platform === 'darwin' && existsSync(caches)) return { folder: caches, source: 'default' };
   return { source: 'unknown' };
 }
 

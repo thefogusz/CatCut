@@ -74,6 +74,7 @@ function printDoctor(d) {
     out(`  ffmpeg version   ${d['ffmpegVersion'] ?? '-'}`);
     out(`  AE version       ${d['aeVersion']}`);
     out(`  Premiere bridge  ${d['premiereBridge'] ?? '-'}`);
+    out(`  captions         ${d['captions'] ?? '-'}`);
     out('');
     out(`encoders  ${Object.entries(enc).map(([k, v]) => `${v ? '+' : '-'}${k}`).join('  ')}`);
     out(`gpu       ${d['gpu']}`);

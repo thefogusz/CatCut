@@ -19,6 +19,8 @@ export declare const ACTIONS: {
     aeNotFound: () => UserAction;
     aeFirstRun: (o?: Opts) => UserAction;
     aeAllowScripts: () => UserAction;
+    aeCloseMac: () => UserAction;
+    macAutomation: () => UserAction;
     ffmpegMissing: (o?: Opts) => UserAction;
     premiereNotFound: () => UserAction;
     bridgeNotInstalled: () => UserAction;

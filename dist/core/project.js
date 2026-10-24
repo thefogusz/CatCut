@@ -76,6 +76,7 @@ function parseProject(raw, abs, file) {
         ...(data.board !== undefined ? { board: data.board } : {}),
         ...(data.constraints !== undefined ? { constraints: data.constraints } : {}),
         ...(data.styleRules !== undefined ? { styleRules: data.styleRules } : {}),
+        ...(data.captions !== undefined ? { captions: data.captions } : {}),
     };
 }
 // ---------- optimistic concurrency ----------
@@ -102,8 +103,8 @@ export class ProjectLockedError extends Error {
 }
 const bases = new WeakMap();
 function persistedOf(p) {
-    const { meta, assets, timeline, delivery, versions, board, constraints, styleRules } = p;
-    return JSON.parse(JSON.stringify({ meta, assets, timeline, delivery, versions, board, constraints, styleRules }));
+    const { meta, assets, timeline, delivery, versions, board, constraints, styleRules, captions } = p;
+    return JSON.parse(JSON.stringify({ meta, assets, timeline, delivery, versions, board, constraints, styleRules, captions }));
 }
 function revisionOf(raw) {
     try {
@@ -221,14 +222,19 @@ function protectedPaths() {
     const extra = (process.env['EDITMCP_PROTECTED_PATHS'] ?? '').split(';').map((s) => s.trim()).filter(Boolean);
     return [...BUILTIN_PROTECTED, ...extra];
 }
+/** Windows absolute path ("D:\\job", "\\\\server\\share"): compared the Windows way on every OS, never resolved against cwd. */
+const WIN_ABS = /^(?:[A-Za-z]:[\\/]|\\\\)/;
 function pathKey(p) {
-    const r = path.resolve(p).replace(/[\\/]+$/, '');
-    return process.platform === 'win32' ? r.toLowerCase() : r;
+    if (process.platform === 'win32' || WIN_ABS.test(p))
+        return path.win32.resolve(p).replace(/[\\/]+$/, '').toLowerCase();
+    return path.resolve(p).replace(/\/+$/, '');
 }
 function under(target, root) {
     const t = pathKey(target);
     const r = pathKey(root);
-    return t === r || t.startsWith(r + path.sep) || (process.platform === 'win32' && t.startsWith(r + '/'));
+    // a backslash is an ordinary file name character in POSIX keys
+    const seps = r.startsWith('/') ? ['/'] : ['\\', '/'];
+    return t === r || seps.some((s) => t.startsWith(r + s));
 }
 /** Real path of the nearest existing ancestor + the rest (defeats junctions/symlinks into a protected tree). */
 function realish(p) {

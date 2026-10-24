@@ -17,6 +17,7 @@ import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
 import type { Frames, QcIssue, QcReport, ToolPaths } from '../core/types.js';
+import { labelFontOpt } from '../core/platform.js';
 import { framesToTc } from '../core/timecode.js';
 
 export interface QcLoudnessTarget {
@@ -84,7 +85,6 @@ const SHEET_COLUMNS = 6;
 const SHEET_THUMB_WIDTH = 320;
 const SHEET_TARGET_THUMBS = 36;
 
-const WINDOWS_FONT = 'C:/Windows/Fonts/arial.ttf';
 
 // ---------- process helper ----------
 
@@ -441,7 +441,8 @@ async function contactSheet(
   const thumbs = Math.ceil(frames / step);
   const rows = Math.max(1, Math.ceil(thumbs / SHEET_COLUMNS));
   const fontOpts: Array<string | undefined> = [];
-  if (existsSync(WINDOWS_FONT)) fontOpts.push(`fontfile='${WINDOWS_FONT.replace(':', '\\:')}'`);
+  const labelFont = labelFontOpt();
+  if (labelFont) fontOpts.push(labelFont);
   fontOpts.push('font=Sans', undefined);
   let lastErr = '';
   for (const fontOpt of fontOpts) {

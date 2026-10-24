@@ -577,13 +577,16 @@ describe('saveProject concurrency', () => {
 
   it('refuses to create or save projects inside protected paths', async () => {
     expect(isProtected('D:\\261009_STB50Y_THAI-WORLD_CSR')).toBe(true);
-    expect(isProtected('d:/261009_stb50y_thai-world_csr/sub/project.json')).toBe(process.platform === 'win32');
+    // Windows-style paths are compared the Windows way (case-insensitive) on every OS
+    expect(isProtected('d:/261009_stb50y_thai-world_csr/sub/project.json')).toBe(true);
     expect(isProtected('D:\\261009_STB50Y_THAI-WORLD_CSR_other')).toBe(false);
     const locked = path.join(dir, 'locked');
     const prev = process.env['EDITMCP_PROTECTED_PATHS'];
     process.env['EDITMCP_PROTECTED_PATHS'] = ` ${path.join(dir, 'elsewhere')} ;${locked}`;
     try {
       expect(isProtected(path.join(locked, 'a', 'b'))).toBe(true);
+      // POSIX: a backslash is part of a file name, so "locked\\x" is a sibling, not inside "locked"
+      if (process.platform !== 'win32') expect(isProtected(`${locked}\\x`)).toBe(false);
       await expect(createProject(path.join(locked, 'p'), { name: 'x' })).rejects.toThrow(/protected/);
       expect(existsSync(locked)).toBe(false);
       await expect(saveProject(fixtureProject({ dir: path.join(locked, 'q') }))).rejects.toThrow(/protected/);

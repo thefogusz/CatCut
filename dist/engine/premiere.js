@@ -2,7 +2,7 @@
  * Premiere Pro handoff over the CatCut bridge (premiere/catcut-bridge, a CEP extension that starts
  * by itself inside Premiere): no computer use, no panel clicks. Premiere has no headless mode, so it
  * runs while CatCut talks to it; CatCut opens it with the right project (`openPremiere`) and says
- * when it may be closed. The Windows session must stay logged in; the screen may be off or locked.
+ * when it may be closed. The user session (Windows or macOS) must stay logged in; the screen may be off or locked.
  *
  * Queue protocol 1 (see premiere/catcut-bridge/bridge-core.js) in an ASCII temp folder:
  * CatCut writes <id>.req.json, the bridge answers <id>.res.json and keeps bridge.json fresh (also
@@ -18,6 +18,7 @@ import { dirname, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { ACTIONS, UserActionError } from '../core/user-action.js';
+import { isBundleProcess, listPosixProcesses, localAppDataDir } from '../core/platform.js';
 import { isAscii } from './aerender.js';
 export const BRIDGE_ID = 'com.catcut.bridge';
 const PROTOCOL = 1;
@@ -27,15 +28,21 @@ const DIALOG_AFTER_MS = 45_000;
 export function legacyQueueDir() {
     return join(os.tmpdir(), 'catcut-premiere-bridge');
 }
-/** %LOCALAPPDATA%\CatCut\bridge (same rule as the bridge's index.html); TEMP only when that path is not ASCII. */
+/**
+ * %LOCALAPPDATA%\CatCut\bridge (~/Library/Application Support/CatCut/bridge on macOS; same rule as the
+ * bridge's index.html); TEMP only when that path is not ASCII.
+ */
 export function defaultQueueDir() {
     const env = process.env['CATCUT_PREMIERE_BRIDGE_DIR'];
     if (env)
         return env;
-    const local = process.env['LOCALAPPDATA'];
+    const local = process.platform === 'win32' ? process.env['LOCALAPPDATA'] : localAppDataDir();
     return local && isAscii(local) ? join(local, 'CatCut', 'bridge') : legacyQueueDir();
 }
+/** Per-user CEP extensions folder: %APPDATA%\Adobe\CEP\extensions or ~/Library/Application Support/Adobe/CEP/extensions. */
 export function cepExtensionsDir() {
+    if (process.platform === 'darwin')
+        return join(localAppDataDir(), 'Adobe', 'CEP', 'extensions');
     return join(process.env['APPDATA'] ?? join(os.homedir(), 'AppData', 'Roaming'), 'Adobe', 'CEP', 'extensions');
 }
 export function createPremiereClient(opts = {}) {
@@ -147,12 +154,23 @@ export async function stagePath(client, ext) {
 export function premiereHost(spawn = execa) {
     return {
         async running() {
-            if (process.platform !== 'win32')
-                return [];
+            if (process.platform !== 'win32') {
+                return (await listPosixProcesses()).filter((p) => isBundleProcess(p.command, /^Adobe Premiere Pro\b/i)).map((p) => p.pid);
+            }
             const r = await spawn('tasklist', ['/FO', 'CSV', '/NH', '/FI', 'IMAGENAME eq Adobe Premiere Pro.exe'], { reject: false, windowsHide: true, timeout: 15_000 });
             return String(r.stdout ?? '').split(/\r?\n/).map((l) => /^"Adobe Premiere Pro\.exe","(\d+)"/i.exec(l)?.[1]).filter((x) => !!x).map(Number);
         },
         async debugModeMissing() {
+            if (process.platform === 'darwin') {
+                const missing = [];
+                for (const v of CSXS_VERSIONS) {
+                    const domain = `com.adobe.CSXS.${v}`;
+                    const r = await spawn('defaults', ['read', domain, 'PlayerDebugMode'], { reject: false, timeout: 15_000 });
+                    if (r.exitCode !== 0 || String(r.stdout ?? '').trim() !== '1')
+                        missing.push(domain);
+                }
+                return missing;
+            }
             if (process.platform !== 'win32')
                 return [];
             const missing = [];
@@ -165,8 +183,11 @@ export function premiereHost(spawn = execa) {
             return missing;
         },
         launch(exe, project) {
-            // detached + unref: Premiere outlives this call and CatCut never waits on it; no shell
-            const child = nodeSpawn(exe, [project], { detached: true, stdio: 'ignore', windowsHide: false });
+            // detached + unref: Premiere outlives this call and CatCut never waits on it; no shell.
+            // macOS: `exe` is the .app bundle, started through LaunchServices.
+            const child = /\.app\/?$/i.test(exe)
+                ? nodeSpawn('open', ['-a', exe, project], { detached: true, stdio: 'ignore' })
+                : nodeSpawn(exe, [project], { detached: true, stdio: 'ignore', windowsHide: false });
             child.on('error', () => undefined);
             child.unref();
             return { pid: child.pid };
@@ -281,7 +302,7 @@ export function bridgeSourceDir() {
 const CSXS_VERSIONS = [9, 10, 11, 12];
 /** Where replaced bridges are kept (outside the CEP folder: Premiere must not load them). */
 export function bridgeBackupRoot() {
-    return join(process.env['LOCALAPPDATA'] ?? join(os.homedir(), 'AppData', 'Local'), 'CatCut', 'bridge-backups');
+    return join(localAppDataDir(), 'CatCut', 'bridge-backups');
 }
 /**
  * Copies the extension into the user's CEP folder (replacing an older CatCut bridge only) and sets
@@ -311,11 +332,15 @@ export async function installBridge(opts = {}) {
     if (userFile)
         await cp(userFile, join(dest, 'host.user.jsx'));
     const keys = [];
+    const mac = (opts.platform ?? process.platform) === 'darwin';
     for (const v of CSXS_VERSIONS) {
-        const key = `HKCU\\Software\\Adobe\\CSXS.${v}`;
-        const r = await spawn('reg', ['add', key, '/v', 'PlayerDebugMode', '/t', 'REG_SZ', '/d', '1', '/f'], { reject: false, windowsHide: true, timeout: 15_000 });
+        // Windows: registry value; macOS: the com.adobe.CSXS.<v> user defaults domain
+        const key = mac ? `com.adobe.CSXS.${v}` : `HKCU\\Software\\Adobe\\CSXS.${v}`;
+        const r = mac
+            ? await spawn('defaults', ['write', key, 'PlayerDebugMode', '1'], { reject: false, timeout: 15_000 })
+            : await spawn('reg', ['add', key, '/v', 'PlayerDebugMode', '/t', 'REG_SZ', '/d', '1', '/f'], { reject: false, windowsHide: true, timeout: 15_000 });
         if (r.exitCode !== 0)
-            throw new Error(`could not set ${key}\\PlayerDebugMode: ${String(r.stderr ?? '').trim()}`);
+            throw new Error(`could not set ${key} PlayerDebugMode: ${String(r.stderr ?? '').trim()}`);
         keys.push(key);
     }
     return { installedTo: dest, debugModeKeys: keys, ...(backup ? { backup } : {}), keptUserActions: !!userFile };

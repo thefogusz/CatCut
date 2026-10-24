@@ -9,6 +9,7 @@ import os from 'node:os';
 import type { ReviewServer } from '../review/server.js';
 import type { PremiereClient, PremiereHost } from '../engine/premiere.js';
 import { getEnvironment } from '../core/tools.js';
+import { freeRamBytes } from '../core/platform.js';
 import type {
   AeBackend, AeCompAsset, Asset, BuildOptions, BuildResult, DeliveryTargetId, Environment, FileAsset, Frames,
   JobInfo, ProbeInfo, Progress, Project, Timeline, XmemlReadResult, XmemlWriteOptions,
@@ -86,7 +87,7 @@ export async function safeEnvironment(): Promise<{ env: Environment; problems: s
       tools: { ffmpeg: '', ffprobe: '' },
       encoders: { h264_nvenc: false, h264_qsv: false, hevc_nvenc: false, libx264: false, prores_ks: false, dnxhd: false, mpeg2video: false },
       totalRamGb: os.totalmem() / 2 ** 30,
-      freeRamGb: os.freemem() / 2 ** 30,
+      freeRamGb: freeRamBytes() / 2 ** 30,
       cpuThreads: os.cpus().length,
     };
     return { env, problems: [err instanceof Error ? err.message : String(err)] };
